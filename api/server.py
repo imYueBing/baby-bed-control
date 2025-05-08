@@ -141,4 +141,28 @@ class APIServer:
             # 最多等待5秒
             self.server_thread.join(timeout=5)
         
-        logger.info("API服务器已停止") 
+        logger.info("API服务器已停止")
+        
+    def start_camera_debug(self, window_name="摄像头调试"):
+        """
+        启动摄像头调试窗口
+        
+        Args:
+            window_name (str): 窗口名称
+            
+        Returns:
+            bool: 是否成功启动调试窗口
+        """
+        if not self.camera_manager:
+            logger.error("摄像头管理器未初始化")
+            return False
+            
+        return self.camera_manager.start_debug_window(window_name=window_name)
+        
+    def stop_camera_debug(self):
+        """停止摄像头调试窗口"""
+        if not self.camera_manager:
+            logger.error("摄像头管理器未初始化")
+            return
+            
+        self.camera_manager.stop_debug_window() 

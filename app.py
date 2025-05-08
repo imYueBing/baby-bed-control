@@ -9,6 +9,7 @@ import logging
 import os
 import signal
 import sys
+import argparse
 from dotenv import load_dotenv
 
 # 加载环境变量
@@ -30,6 +31,15 @@ from modules.arduino.controller import ArduinoController
 from modules.camera.camera_manager import CameraManager
 from api.server import APIServer
 from config.settings import get_config
+
+def parse_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description='婴儿智能监控系统')
+    parser.add_argument('--debug-camera', action='store_true', 
+                        help='启用摄像头调试窗口，在本地显示摄像头画面')
+    parser.add_argument('--debug-window-name', type=str, default='摄像头调试',
+                        help='调试窗口名称')
+    return parser.parse_args()
 
 def setup():
     """初始化系统组件"""
@@ -87,18 +97,33 @@ def signal_handler(sig, frame, components=None):
 
 def main():
     """主函数"""
+    # 解析命令行参数
+    args = parse_args()
+    
     try:
         # 初始化组件
         components = setup()
+        arduino_controller, camera_manager, api_server = components
         
         # 注册信号处理
         signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, components))
         signal.signal(signal.SIGTERM, lambda sig, frame: signal_handler(sig, frame, components))
         
         # 启动API服务器
-        api_server = components[2]
         api_server.start()
         
+        # 如果启用了摄像头调试，打开调试窗口
+        if args.debug_camera:
+            logger.info(f"启用摄像头调试窗口: {args.debug_window_name}")
+            api_server.start_camera_debug(window_name=args.debug_window_name)
+            print(f"摄像头调试窗口已启动: {args.debug_window_name}")
+            print("按ESC键可关闭调试窗口")
+        
+        # 保持主线程运行
+        print("系统已启动，按Ctrl+C退出")
+        while True:
+            signal.pause()
+            
     except Exception as e:
         logger.error(f"系统启动失败: {e}")
         if 'components' in locals():

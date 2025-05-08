@@ -40,6 +40,8 @@ class CameraManager:
         self.frame_available = threading.Event()
         self.clients = []
         self.clients_lock = threading.Lock()
+        self.debug_window_active = False
+        self.debug_thread = None
         
         # 初始化摄像头
         self._init_camera()
@@ -150,6 +152,7 @@ class CameraManager:
         """关闭摄像头并清理资源"""
         self.is_running = False
         self.stop_recording()
+        self.stop_debug_window()
         
         if self.capture_thread and self.capture_thread.is_alive():
             self.capture_thread.join(timeout=2)
@@ -249,29 +252,19 @@ class CameraManager:
         os.makedirs(output_path, exist_ok=True)
         
         # 创建输出文件名
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.video_file = os.path.join(output_path, f"video_{timestamp}.mp4")
+        filename = f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+        output_file = os.path.join(output_path, filename)
         
-        # 创建视频写入器
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        self.video_writer = cv2.VideoWriter(
-            self.video_file,
-            fourcc,
-            self.framerate,
-            self.resolution
-        )
-        
-        if not self.video_writer.isOpened():
-            logger.error("无法创建视频写入器")
-            return False
-        
-        # 开始录制线程
+        # 开始录制
         self.is_recording = True
-        self.recording_thread = threading.Thread(target=self._recording_loop)
+        self.recording_thread = threading.Thread(
+            target=self._recording_loop,
+            args=(output_file,)
+        )
         self.recording_thread.daemon = True
         self.recording_thread.start()
         
-        logger.info(f"开始录制视频: {self.video_file}")
+        logger.info(f"开始录制视频到 {output_file}")
         return True
     
     def stop_recording(self):
@@ -280,28 +273,135 @@ class CameraManager:
             return
         
         self.is_recording = False
-        
         if self.recording_thread and self.recording_thread.is_alive():
             self.recording_thread.join(timeout=2)
-        
-        if hasattr(self, 'video_writer') and self.video_writer:
-            self.video_writer.release()
-            logger.info(f"视频已保存: {self.video_file}")
+            logger.info("视频录制已停止")
     
-    def _recording_loop(self):
+    def _recording_loop(self, output_file):
         """视频录制循环"""
-        while self.is_recording and self.video_writer:
-            try:
-                # 获取当前帧
+        try:
+            # 设置视频编解码器
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(
+                output_file, 
+                fourcc, 
+                self.framerate,
+                self.resolution
+            )
+            
+            while self.is_recording and self.is_running:
+                # 获取当前帧并写入视频
                 frame = self.get_frame()
+                if frame is not None:
+                    out.write(frame)
                 
-                # 写入帧
-                self.video_writer.write(frame)
+                # 短暂睡眠以减少CPU使用
+                time.sleep(0.01)
                 
-                # 等待下一帧
-                time.sleep(1.0 / self.framerate)
+        except Exception as e:
+            logger.error(f"录制视频时出错: {e}")
+        finally:
+            if 'out' in locals():
+                out.release()
+                logger.info(f"录制的视频已保存到 {output_file}")
                 
-            except Exception as e:
-                logger.error(f"录制视频时出错: {e}")
-                self.is_recording = False
-                break 
+    def start_debug_window(self, window_name="摄像头调试"):
+        """
+        在树莓派上打开一个窗口，实时显示摄像头捕获的画面
+        
+        Args:
+            window_name (str): 窗口标题
+        
+        Returns:
+            bool: 是否成功启动调试窗口
+        """
+        if self.debug_window_active:
+            logger.warning("调试窗口已经在运行")
+            return False
+            
+        self.debug_window_active = True
+        self.debug_window_name = window_name
+        
+        # 创建并启动调试窗口线程
+        self.debug_thread = threading.Thread(
+            target=self._debug_window_loop,
+            args=(window_name,)
+        )
+        self.debug_thread.daemon = True
+        self.debug_thread.start()
+        
+        logger.info(f"已启动摄像头调试窗口: {window_name}")
+        return True
+        
+    def stop_debug_window(self):
+        """停止调试窗口"""
+        if not self.debug_window_active:
+            return
+            
+        self.debug_window_active = False
+        if self.debug_thread and self.debug_thread.is_alive():
+            self.debug_thread.join(timeout=2)
+            cv2.destroyAllWindows()
+            logger.info("摄像头调试窗口已关闭")
+            
+    def _debug_window_loop(self, window_name):
+        """调试窗口显示循环"""
+        try:
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            
+            # 如果是运行在树莓派上，可以设置全屏
+            try:
+                # 检测是否在树莓派上运行
+                with open('/proc/device-tree/model', 'r') as f:
+                    if 'Raspberry Pi' in f.read():
+                        cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            except:
+                pass
+                
+            while self.debug_window_active and self.is_running:
+                # 获取当前帧并在窗口中显示
+                frame = self.get_frame()
+                if frame is not None:
+                    # 添加调试信息
+                    debug_frame = frame.copy()
+                    cv2.putText(
+                        debug_frame,
+                        f"Resolution: {self.resolution[0]}x{self.resolution[1]} | FPS: {self.framerate}",
+                        (10, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (0, 255, 0),
+                        1,
+                        cv2.LINE_AA
+                    )
+                    
+                    # 显示相机类型
+                    camera_type = "PiCamera" if self.use_picamera else "OpenCV"
+                    cv2.putText(
+                        debug_frame,
+                        f"Camera: {camera_type} | Model: Raspberry Pi Camera Module 3 Standard",
+                        (10, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (0, 255, 0),
+                        1,
+                        cv2.LINE_AA
+                    )
+                    
+                    # 显示帧
+                    cv2.imshow(window_name, debug_frame)
+                    
+                # 检查键盘输入，按ESC键退出
+                key = cv2.waitKey(1) & 0xFF
+                if key == 27:  # ESC键
+                    self.debug_window_active = False
+                    break
+                    
+                # 短暂睡眠以减少CPU使用
+                time.sleep(0.01)
+                
+        except Exception as e:
+            logger.error(f"显示调试窗口时出错: {e}")
+        finally:
+            cv2.destroyAllWindows()
+            logger.info("调试窗口已关闭") 
