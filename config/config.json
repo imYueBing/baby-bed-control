@@ -1,0 +1,25 @@
+{
+  "arduino": {
+    "port": "/dev/ttyUSB0",
+    "baud_rate": 9600
+  },
+  "camera": {
+    "resolution": [640, 480],
+    "framerate": 30,
+    "use_picamera": true
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "debug": false
+  },
+  "bed_control": {
+    "min_height": 0,
+    "max_height": 100,
+    "speed": 50
+  },
+  "heart_rate": {
+    "sampling_rate": 1,
+    "warning_threshold": 160
+  }
+}
