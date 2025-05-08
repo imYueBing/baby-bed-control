@@ -53,7 +53,7 @@
 ## 硬件连接
 
 - Arduino：通过USB连接到树莓派，控制床体电机和心率传感器
-- 摄像头：直接连接到树莓派USB端口或使用CSI摄像头接口
+- 摄像头：Raspberry Pi Camera Module 3 Standard，直接连接到树莓派USB端口或使用CSI摄像头接口
 
 ## API文档
 
