@@ -39,6 +39,8 @@ def parse_args():
                         help='启用摄像头调试窗口，在本地显示摄像头画面')
     parser.add_argument('--debug-window-name', type=str, default='摄像头调试',
                         help='调试窗口名称')
+    parser.add_argument('--only-camera', action='store_true', 
+                        help='仅测试摄像头，不启动完整系统')
     return parser.parse_args()
 
 def setup():
@@ -54,8 +56,8 @@ def setup():
     # 初始化 Arduino 控制器
     try:
         arduino_controller = ArduinoController(
-            port=config.get('arduino', 'port'),
-            baud_rate=config.get('arduino', 'baud_rate', 9600)
+            port=config['arduino'].get('port'),
+            baud_rate=config['arduino'].get('baud_rate', 9600)
         )
         logger.info("Arduino 控制器初始化成功")
     except Exception as e:
@@ -64,8 +66,8 @@ def setup():
     # 初始化 摄像头管理器
     try:
         camera_manager = CameraManager(
-            resolution=config.get('camera', 'resolution', [640, 480]),
-            framerate=config.get('camera', 'framerate', 30)
+            resolution=config['camera'].get('resolution', [640, 480]),
+            framerate=config['camera'].get('framerate', 30)
         )
         logger.info("摄像头管理器初始化成功")
     except Exception as e:
@@ -76,8 +78,8 @@ def setup():
         api_server = APIServer(
             arduino_controller=arduino_controller,
             camera_manager=camera_manager,
-            host=config.get('server', 'host', '0.0.0.0'),
-            port=config.get('server', 'port', 5000)
+            host=config['server'].get('host', '0.0.0.0'),
+            port=config['server'].get('port', 5000)
         )
         logger.info("API 服务器初始化成功")
     except Exception as e:
@@ -116,6 +118,27 @@ def main():
     args = parse_args()
     
     try:
+        # 如果仅测试摄像头
+        if args.only_camera:
+            try:
+                print("仅启动摄像头测试模式...")
+                camera = CameraManager(
+                    resolution=(640, 480),
+                    framerate=30
+                )
+                camera.start_debug_window("摄像头测试")
+                print("按ESC键退出")
+                while True:
+                    time.sleep(0.1)
+            except KeyboardInterrupt:
+                pass
+            except Exception as e:
+                print(f"摄像头测试失败: {e}")
+            finally:
+                if 'camera' in locals():
+                    camera.close()
+                return
+
         # 初始化组件
         components = setup()
         arduino_controller, camera_manager, api_server = components
