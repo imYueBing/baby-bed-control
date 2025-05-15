@@ -130,7 +130,8 @@ def main():
         # 如果启用了摄像头调试，打开调试窗口
         if args.debug_camera:
             logger.info(f"启用摄像头调试窗口: {args.debug_window_name}")
-            api_server.start_camera_debug(window_name=args.debug_window_name)
+            if camera_manager:
+                camera_manager.start_debug_window(args.debug_window_name)
             print(f"摄像头调试窗口已启动: {args.debug_window_name}")
             print("按ESC键可关闭调试窗口")
         
