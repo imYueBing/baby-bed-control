@@ -44,31 +44,46 @@ def parse_args():
 def setup():
     """初始化系统组件"""
     logger.info("婴儿智能监控系统启动中...")
-    
-    # 加载配置
+
     config = get_config()
-    
-    # 初始化Arduino控制器
-    arduino_controller = ArduinoController(
-        port=config.get('arduino', 'port'),
-        baud_rate=config.get('arduino', 'baud_rate', 9600)
-    )
-    
-    # 初始化摄像头管理器
-    camera_manager = CameraManager(
-        resolution=config.get('camera', 'resolution', (640, 480)),
-        framerate=config.get('camera', 'framerate', 30)
-    )
-    
-    # 初始化API服务器
-    api_server = APIServer(
-        arduino_controller=arduino_controller,
-        camera_manager=camera_manager,
-        host=config.get('server', 'host', '0.0.0.0'),
-        port=config.get('server', 'port', 5000)
-    )
-    
-    # 返回初始化的组件
+
+    arduino_controller = None
+    camera_manager = None
+    api_server = None
+
+    # 初始化 Arduino 控制器
+    try:
+        arduino_controller = ArduinoController(
+            port=config.get('arduino', 'port'),
+            baud_rate=config.get('arduino', 'baud_rate', 9600)
+        )
+        logger.info("Arduino 控制器初始化成功")
+    except Exception as e:
+        logger.warning(f"Arduino 初始化失败: {e}")
+
+    # 初始化 摄像头管理器
+    try:
+        camera_manager = CameraManager(
+            resolution=config.get('camera', 'resolution', [640, 480]),
+            framerate=config.get('camera', 'framerate', 30)
+        )
+        logger.info("摄像头管理器初始化成功")
+    except Exception as e:
+        logger.warning(f"摄像头初始化失败: {e}")
+
+    # 初始化 API 服务器（不依赖上面两个是否成功）
+    try:
+        api_server = APIServer(
+            arduino_controller=arduino_controller,
+            camera_manager=camera_manager,
+            host=config.get('server', 'host', '0.0.0.0'),
+            port=config.get('server', 'port', 5000)
+        )
+        logger.info("API 服务器初始化成功")
+    except Exception as e:
+        logger.error(f"API 服务器初始化失败: {e}")
+        raise
+
     return arduino_controller, camera_manager, api_server
 
 def cleanup(arduino_controller, camera_manager, api_server):
