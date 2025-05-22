@@ -56,8 +56,8 @@ def setup():
     # 初始化 Arduino 控制器
     try:
         arduino_controller = ArduinoController(
-            port=config['arduino'].get('port'),
-            baud_rate=config['arduino'].get('baud_rate', 9600)
+            port=config.get('arduino', 'port'),
+            baud_rate=config.get('arduino', 'baud_rate', 9600)
         )
         logger.info("Arduino 控制器初始化成功")
     except Exception as e:
@@ -66,8 +66,8 @@ def setup():
     # 初始化 摄像头管理器
     try:
         camera_manager = CameraManager(
-            resolution=config['camera'].get('resolution', [640, 480]),
-            framerate=config['camera'].get('framerate', 30)
+            resolution=config.get('camera', 'resolution', [640, 480]),
+            framerate=config.get('camera', 'framerate', 30)
         )
         logger.info("摄像头管理器初始化成功")
     except Exception as e:
@@ -78,8 +78,8 @@ def setup():
         api_server = APIServer(
             arduino_controller=arduino_controller,
             camera_manager=camera_manager,
-            host=config['server'].get('host', '0.0.0.0'),
-            port=config['server'].get('port', 5000)
+            host=config.get('server', 'host', '0.0.0.0'),
+            port=config.get('server', 'port', 5000)
         )
         logger.info("API 服务器初始化成功")
     except Exception as e:
