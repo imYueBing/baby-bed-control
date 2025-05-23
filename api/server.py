@@ -190,7 +190,7 @@ def parse_args():
                         help='不使用Arduino控制器，以仅相机模式运行')
     return parser.parse_args()
 
-def setup(args):
+def setup(args=None):
     """初始化系统组件"""
     logger.info("婴儿智能监控系统启动中...")
 
@@ -201,7 +201,7 @@ def setup(args):
     api_server = None
 
     # 初始化 Arduino 控制器（如果未指定--no-arduino）
-    if not args.no_arduino:
+    if not (args and args.no_arduino):
         try:
             arduino_controller = ArduinoController(
                 port=config.get('arduino', 'port'),
