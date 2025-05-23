@@ -10,6 +10,9 @@ import threading
 import time
 from flask import Flask
 from flask_socketio import SocketIO
+import argparse
+import signal
+import sys
 
 # 导入API端点
 from .endpoints.bed import bed_api, init_bed_api
@@ -33,7 +36,7 @@ class APIServer:
         初始化API服务器
         
         Args:
-            arduino_controller: Arduino控制器实例
+            arduino_controller: Arduino控制器实例，可以为None表示不使用Arduino
             camera_manager: 摄像头管理器实例
             host (str): 监听主机
             port (int): 监听端口
@@ -46,6 +49,13 @@ class APIServer:
         self.debug = debug
         self.server_thread = None
         self.is_running = False
+        
+        # 添加一个标志，表示Arduino控制器是否可用
+        self.arduino_available = arduino_controller is not None
+        
+        # 如果Arduino控制器不可用，记录警告日志
+        if not self.arduino_available:
+            logger.warning("Arduino控制器未提供，将以'仅相机模式'运行。所有与Arduino相关的功能将不可用或返回模拟数据。")
         
         # 初始化Flask应用
         self.app = Flask(__name__)
@@ -165,4 +175,122 @@ class APIServer:
             logger.error("摄像头管理器未初始化")
             return
             
-        self.camera_manager.stop_debug_window() 
+        self.camera_manager.stop_debug_window()
+
+def parse_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description='婴儿智能监控系统')
+    parser.add_argument('--debug-camera', action='store_true', 
+                      help='启用摄像头调试窗口，在本地显示摄像头画面')
+    parser.add_argument('--debug-window-name', type=str, default='摄像头调试',
+                      help='调试窗口名称')
+    parser.add_argument('--only-camera', action='store_true', 
+                      help='仅测试摄像头，不启动完整系统')
+    parser.add_argument('--no-arduino', action='store_true',
+                      help='不使用Arduino控制器，以仅相机模式运行')
+    return parser.parse_args() 
+
+def setup(args):
+    """初始化系统组件"""
+    logger.info("婴儿智能监控系统启动中...")
+
+    config = get_config()
+
+    arduino_controller = None
+    camera_manager = None
+    api_server = None
+
+    # 初始化 Arduino 控制器（如果未指定--no-arduino）
+    if not args.no_arduino:
+        try:
+            arduino_controller = ArduinoController(
+                port=config.get('arduino', 'port'),
+                baud_rate=config.get('arduino', 'baud_rate', 9600)
+            )
+            logger.info("Arduino 控制器初始化成功")
+        except Exception as e:
+            logger.warning(f"Arduino 初始化失败: {e}")
+    else:
+        logger.info("以仅相机模式运行，不使用Arduino控制器")
+
+    # 初始化 摄像头管理器
+    try:
+        camera_manager = CameraManager(
+            resolution=config.get('camera', 'resolution', [640, 480]),
+            framerate=config.get('camera', 'framerate', 30)
+        )
+        logger.info("摄像头管理器初始化成功")
+    except Exception as e:
+        logger.warning(f"摄像头初始化失败: {e}")
+
+    # 初始化 API 服务器
+    try:
+        api_server = APIServer(
+            arduino_controller=arduino_controller,  # 可能为None
+            camera_manager=camera_manager,
+            host=config.get('server', 'host', '0.0.0.0'),
+            port=config.get('server', 'port', 5000)
+        )
+        logger.info("API 服务器初始化成功")
+    except Exception as e:
+        logger.error(f"API 服务器初始化失败: {e}")
+        raise
+
+    return arduino_controller, camera_manager, api_server 
+
+def main():
+    """主函数"""
+    # 解析命令行参数
+    args = parse_args()
+    
+    try:
+        # 如果仅测试摄像头
+        if args.only_camera:
+            try:
+                print("仅启动摄像头测试模式...")
+                camera = CameraManager(
+                    resolution=(640, 480),
+                    framerate=30
+                )
+                camera.start_debug_window("摄像头测试")
+                print("按ESC键退出")
+                while True:
+                    time.sleep(0.1)
+            except KeyboardInterrupt:
+                pass
+            except Exception as e:
+                print(f"摄像头测试失败: {e}")
+            finally:
+                if 'camera' in locals():
+                    camera.close()
+                return
+
+        # 初始化组件
+        components = setup(args)  # 传递args参数
+        arduino_controller, camera_manager, api_server = components
+        
+        # 注册信号处理
+        signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, components))
+        signal.signal(signal.SIGTERM, lambda sig, frame: signal_handler(sig, frame, components))
+        
+        # 启动API服务器
+        api_server.start()
+        
+        # 如果启用了摄像头调试，打开调试窗口
+        if args.debug_camera and camera_manager:
+            logger.info(f"启用摄像头调试窗口: {args.debug_window_name}")
+            camera_manager.start_debug_window(args.debug_window_name)
+            print(f"摄像头调试窗口已启动: {args.debug_window_name}")
+            print("按ESC键可关闭调试窗口")
+        
+        # 保持主线程运行
+        print("系统已启动" + ("（仅相机模式）" if args.no_arduino else ""))
+        print("按Ctrl+C退出")
+        while True:
+            signal.pause()
+            
+    except Exception as e:
+        logger.error(f"系统启动失败: {e}")
+        if 'components' in locals():
+            cleanup(*components)
+        sys.exit(1) 
