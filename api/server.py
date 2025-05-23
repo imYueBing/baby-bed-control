@@ -181,14 +181,14 @@ def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description='婴儿智能监控系统')
     parser.add_argument('--debug-camera', action='store_true', 
-                      help='启用摄像头调试窗口，在本地显示摄像头画面')
+                        help='启用摄像头调试窗口，在本地显示摄像头画面')
     parser.add_argument('--debug-window-name', type=str, default='摄像头调试',
-                      help='调试窗口名称')
+                        help='调试窗口名称')
     parser.add_argument('--only-camera', action='store_true', 
-                      help='仅测试摄像头，不启动完整系统')
+                        help='仅测试摄像头，不启动完整系统')
     parser.add_argument('--no-arduino', action='store_true',
-                      help='不使用Arduino控制器，以仅相机模式运行')
-    return parser.parse_args() 
+                        help='不使用Arduino控制器，以仅相机模式运行')
+    return parser.parse_args()
 
 def setup(args):
     """初始化系统组件"""
