@@ -10,6 +10,7 @@ import os
 import signal
 import sys
 import argparse
+import time
 from dotenv import load_dotenv
 
 # 加载环境变量
@@ -41,9 +42,11 @@ def parse_args():
                         help='调试窗口名称')
     parser.add_argument('--only-camera', action='store_true', 
                         help='仅测试摄像头，不启动完整系统')
+    parser.add_argument('--no-arduino', action='store_true',  # <--- 确保这行在 app.py 的 parse_args 中
+                        help='不使用Arduino控制器，以仅相机模式运行')
     return parser.parse_args()
 
-def setup():
+def setup(args):
     """初始化系统组件"""
     logger.info("婴儿智能监控系统启动中...")
 
@@ -53,15 +56,18 @@ def setup():
     camera_manager = None
     api_server = None
 
-    # 初始化 Arduino 控制器
-    try:
-        arduino_controller = ArduinoController(
-            port=config.get('arduino', 'port'),
-            baud_rate=config.get('arduino', 'baud_rate', 9600)
-        )
-        logger.info("Arduino 控制器初始化成功")
-    except Exception as e:
-        logger.warning(f"Arduino 初始化失败: {e}")
+    # 初始化 Arduino 控制器（如果未指定--no-arduino）
+    if not args.no_arduino:
+        try:
+            arduino_controller = ArduinoController(
+                port=config.get('arduino', 'port'),
+                baud_rate=config.get('arduino', 'baud_rate', 9600)
+            )
+            logger.info("Arduino 控制器初始化成功")
+        except Exception as e:
+            logger.warning(f"Arduino 初始化失败: {e}")
+    else:
+        logger.info("以仅相机模式运行，不使用Arduino控制器")
 
     # 初始化 摄像头管理器
     try:
@@ -73,20 +79,16 @@ def setup():
     except Exception as e:
         logger.warning(f"摄像头初始化失败: {e}")
 
-    # 初始化 API 服务器（不依赖上面两个是否成功）
-    try:
-        api_server = APIServer(
-            arduino_controller=arduino_controller,
-            camera_manager=camera_manager,
-            host=config.get('server', 'host', '0.0.0.0'),
-            port=config.get('server', 'port', 5000)
-        )
-        logger.info("API 服务器初始化成功")
-    except Exception as e:
-        logger.error(f"API 服务器初始化失败: {e}")
-        raise
+    # 初始化 API 服务器 - 这里应该只创建 APIServer 实例
+    api_server_instance = APIServer(
+        arduino_controller=arduino_controller,
+        camera_manager=camera_manager,
+        host=config.get('server', 'host', '0.0.0.0'),
+        port=config.get('server', 'port', 5000)
+    )
+    logger.info("API 服务器对象创建成功")
 
-    return arduino_controller, camera_manager, api_server
+    return arduino_controller, camera_manager, api_server_instance
 
 def cleanup(arduino_controller, camera_manager, api_server):
     """清理资源"""
@@ -114,11 +116,9 @@ def signal_handler(sig, frame, components=None):
 
 def main():
     """主函数"""
-    # 解析命令行参数
     args = parse_args()
     
     try:
-        # 如果仅测试摄像头
         if args.only_camera:
             try:
                 print("仅启动摄像头测试模式...")
@@ -139,34 +139,36 @@ def main():
                     camera.close()
                 return
 
-        # 初始化组件
-        components = setup()
-        arduino_controller, camera_manager, api_server = components
+        components = setup(args)
+        arduino_controller, camera_manager, api_server_instance = components
         
-        # 注册信号处理
         signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, components))
         signal.signal(signal.SIGTERM, lambda sig, frame: signal_handler(sig, frame, components))
         
-        # 启动API服务器
-        api_server.start()
+        if api_server_instance:
+            api_server_instance.start()
+        else:
+            logger.error("API 服务器实例未能创建。")
+            return
         
-        # 如果启用了摄像头调试，打开调试窗口
-        if args.debug_camera:
+        if args.debug_camera and camera_manager:
             logger.info(f"启用摄像头调试窗口: {args.debug_window_name}")
-            if camera_manager:
-                camera_manager.start_debug_window(args.debug_window_name)
+            camera_manager.start_debug_window(args.debug_window_name)
             print(f"摄像头调试窗口已启动: {args.debug_window_name}")
             print("按ESC键可关闭调试窗口")
         
-        # 保持主线程运行
-        print("系统已启动，按Ctrl+C退出")
+        print("系统已启动" + ("（仅相机模式）" if args.no_arduino else ""))
+        print("按Ctrl+C退出")
         while True:
             signal.pause()
             
     except Exception as e:
         logger.error(f"系统启动失败: {e}")
-        if 'components' in locals():
+        if 'components' in locals() and components[2]:
             cleanup(*components)
+        elif 'components' in locals():
+            if components[0]: components[0].close()
+            if components[1]: components[1].close()
         sys.exit(1)
 
 if __name__ == "__main__":
