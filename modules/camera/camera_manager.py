@@ -49,6 +49,7 @@ class CameraManager:
     def _init_camera(self):
         """初始化摄像头"""
         try:
+            logger.debug(f"Attempting to initialize camera with resolution: {self.resolution} (type: {type(self.resolution)}) and framerate: {self.framerate}")
             # 尝试使用PiCamera库（如果可用且启用）
             if self.use_picamera:
                 try:
@@ -68,8 +69,14 @@ class CameraManager:
             # 如果不使用PiCamera或者导入失败，使用OpenCV
             if not self.use_picamera:
                 self.camera = cv2.VideoCapture(0)
-                self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
-                self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+                # Add checks before accessing resolution elements
+                if isinstance(self.resolution, list) and len(self.resolution) >= 2:
+                    self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+                    self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+                else:
+                    logger.error(f"Invalid camera resolution format: {self.resolution}. Expected a list of two integers.")
+                    # Handle error, maybe default to a safe resolution or raise an exception
+                    # For now, let's just log and potentially let it fail later if OpenCV can't handle it
                 self.camera.set(cv2.CAP_PROP_FPS, self.framerate)
                 
                 if not self.camera.isOpened():
@@ -84,8 +91,9 @@ class CameraManager:
             self.capture_thread.start()
             
         except Exception as e:
-            logger.error(f"初始化摄像头失败: {e}")
+            logger.error(f"初始化摄像头失败: {e}", exc_info=True) # exc_info=True will print traceback
             self.camera = None
+            self.is_running = False # Ensure is_running is set to False on failure
     
     def _capture_loop(self):
         """捕获视频帧的循环"""

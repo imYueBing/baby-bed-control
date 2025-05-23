@@ -95,11 +95,38 @@ class APIServer:
             """处理WebSocket断开连接"""
             logger.info("WebSocket客户端已断开连接")
         
-        # 注册功能模块的WebSocket事件
-        register_bed_socketio_events(self.socketio, self.arduino_controller)
-        register_heart_rate_socketio_events(self.socketio, self.arduino_controller)
+        # 注册视频相关的WebSocket事件 (这个不依赖Arduino)
         register_video_socketio_events(self.socketio, self.camera_manager)
+        
+        # 只有在Arduino可用时，才注册依赖Arduino的WebSocket事件
+        if self.arduino_available:
+            logger.info("Arduino 可用，注册 Arduino 相关 WebSocket 事件...")
+            register_bed_socketio_events(self.socketio, self.arduino_controller)
+            register_heart_rate_socketio_events(self.socketio, self.arduino_controller)
+        else:
+            logger.warning("Arduino 不可用，跳过 Arduino 相关 WebSocket 事件的注册。")
+            # 可选：在这里可以为床体和心率注册一些模拟的/提示性的WebSocket事件
+            # 例如，当客户端请求时，返回 "Arduino not connected"
+            self._setup_mock_arduino_socketio_events()
     
+    def _setup_mock_arduino_socketio_events(self):
+        """配置当Arduino不可用时的模拟WebSocket事件处理"""
+        @self.socketio.on('request_bed_status') # 假设有这个事件
+        def handle_mock_bed_status():
+            self.socketio.emit('bed_status_update', {
+                'status': 'error',
+                'message': 'Arduino not connected',
+                'bed_height': None
+            })
+        
+        @self.socketio.on('request_heart_rate')
+        def handle_mock_heart_rate():
+            self.socketio.emit('heart_rate_update', {
+                'status': 'error',
+                'message': 'Arduino not connected',
+                'heart_rate': None
+            })
+        
     def start(self):
         """启动服务器"""
         if self.is_running:
