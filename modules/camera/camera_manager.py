@@ -12,6 +12,9 @@ import time
 import numpy as np
 from datetime import datetime
 import os
+# BEGIN AI FACE DETECTION IMPORTS
+import tflite_runtime.interpreter as tflite
+# END AI FACE DETECTION IMPORTS
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -19,7 +22,11 @@ logger = logging.getLogger(__name__)
 class CameraManager:
     """摄像头管理类，负责视频捕获和处理"""
     
-    def __init__(self, resolution=(640, 480), framerate=30, use_picamera=True):
+    def __init__(self, resolution=(640, 480), framerate=30, use_picamera=True, 
+                 enable_ai_face_detection=False, # AI 功能开关
+                 cascade_path="/home/jeong/opencv_cascades/haarcascade_frontalface_default.xml", # TODO: Make this configurable
+                 tflite_model_path="/home/jeong/frontal_face_classifier.tflite" # TODO: Make this configurable
+                ):
         """
         初始化摄像头管理器
         
@@ -27,6 +34,9 @@ class CameraManager:
             resolution (tuple): 分辨率 (宽, 高)
             framerate (int): 帧率
             use_picamera (bool): 是否使用树莓派摄像头
+            enable_ai_face_detection (bool): 是否启用AI人脸检测
+            cascade_path (str): Haar cascade模型的路径
+            tflite_model_path (str): TFLite模型的路径
         """
         self.resolution = resolution
         self.framerate = framerate
@@ -42,6 +52,16 @@ class CameraManager:
         self.clients_lock = threading.Lock()
         self.debug_window_active = False
         self.debug_thread = None
+
+        # AI Face Detection attributes
+        self.enable_ai_face_detection = enable_ai_face_detection
+        self.face_cascade = None
+        self.tflite_interpreter = None
+        self.tflite_input_details = None
+        self.tflite_output_details = None
+
+        if self.enable_ai_face_detection:
+            self._initialize_ai_models(cascade_path, tflite_model_path)
         
         # 初始化摄像头
         self._init_camera()
@@ -95,6 +115,87 @@ class CameraManager:
             self.camera = None
             self.is_running = False # Ensure is_running is set to False on failure
     
+    def _initialize_ai_models(self, cascade_path, tflite_model_path):
+        """初始化AI人脸识别模型"""
+        logger.info("Initializing AI face detection models...")
+        # 1. Haar cascade 경로 설정 및 로딩
+        # TODO: These paths should be made configurable (e.g., via settings file or env vars)
+        # For now, using the provided paths.
+        if not os.path.exists(cascade_path):
+            logger.error(f"Haar cascade file not found: {cascade_path}")
+            self.enable_ai_face_detection = False # Disable AI if model is missing
+            return
+        try:
+            self.face_cascade = cv2.CascadeClassifier(cascade_path)
+            logger.info(f"Haar cascade loaded from {cascade_path}")
+        except Exception as e:
+            logger.error(f"Error loading Haar cascade from {cascade_path}: {e}")
+            self.enable_ai_face_detection = False
+            return
+
+        # 2. TFLite 모델 로딩
+        if not os.path.exists(tflite_model_path):
+            logger.error(f"TFLite model file not found: {tflite_model_path}")
+            self.enable_ai_face_detection = False # Disable AI if model is missing
+            return
+        try:
+            self.tflite_interpreter = tflite.Interpreter(model_path=tflite_model_path)
+            self.tflite_interpreter.allocate_tensors()
+            self.tflite_input_details = self.tflite_interpreter.get_input_details()
+            self.tflite_output_details = self.tflite_interpreter.get_output_details()
+            logger.info(f"TFLite model loaded from {tflite_model_path}")
+        except Exception as e:
+            logger.error(f"Error loading TFLite model from {tflite_model_path}: {e}")
+            self.enable_ai_face_detection = False
+            return
+        logger.info("AI face detection models initialized successfully.")
+
+    def _apply_ai_face_detection(self, frame_to_process):
+        """在给定帧上应用AI人脸检测和分类"""
+        if not self.enable_ai_face_detection or self.face_cascade is None or self.tflite_interpreter is None:
+            return frame_to_process
+
+        gray = cv2.cvtColor(frame_to_process, cv2.COLOR_BGR2GRAY)
+        # Parameters for detectMultiScale can be tuned
+        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30,30))
+
+        for (x, y, w, h) in faces:
+            face_roi = frame_to_process[y:y+h, x:x+w]
+            
+            try:
+                # Preprocess for TFLite model
+                face_resized = cv2.resize(face_roi, (self.tflite_input_details[0]['shape'][1], self.tflite_input_details[0]['shape'][2]))
+            except cv2.error as e:
+                # This can happen if the face ROI is empty or too small after detection adjustments
+                logger.debug(f"Could not resize face ROI: {e}. Skipping this face.")
+                continue 
+            except Exception as e: # Catch any other unexpected errors during resize
+                logger.warning(f"Unexpected error resizing face ROI: {e}. Skipping this face.")
+                continue
+
+            if face_resized.size == 0: # Double check if face_resized is empty
+                logger.debug("Face ROI resized to an empty image. Skipping.")
+                continue
+
+            input_data = face_resized.astype(np.float32) / 255.0
+            input_data = np.expand_dims(input_data, axis=0)
+
+            self.tflite_interpreter.set_tensor(self.tflite_input_details[0]['index'], input_data)
+            self.tflite_interpreter.invoke()
+            output_data = self.tflite_interpreter.get_tensor(self.tflite_output_details[0]['index'])
+            
+            # Assuming output_data[0][0] is the probability for "Front"
+            probability_front = output_data[0][0] 
+            
+            label = "Front" if probability_front >= 0.5 else "Non-Front"
+            color = (0, 255, 0) if label == "Front" else (0, 0, 255)
+            prob_text = f"{label} ({probability_front:.2f})"
+
+            cv2.rectangle(frame_to_process, (x, y), (x+w, y+h), color, 2)
+            cv2.putText(frame_to_process, prob_text, (x, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        return frame_to_process
+
     def _capture_loop(self):
         """捕获视频帧的循环"""
         while self.is_running and self.camera:
@@ -109,7 +210,11 @@ class CameraManager:
                     # 使用OpenCV
                     success, frame = self.camera.read()
                 
-                if success:
+                if success and frame is not None: # Added frame is not None check
+                    # 应用AI人脸识别 (如果启用)
+                    if self.enable_ai_face_detection:
+                        frame = self._apply_ai_face_detection(frame)
+
                     # 在帧上添加时间戳
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     cv2.putText(

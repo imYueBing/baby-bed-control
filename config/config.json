@@ -6,7 +6,10 @@
   "camera": {
     "resolution": [640, 480],
     "framerate": 30,
-    "use_picamera": true
+    "use_picamera": true,
+    "enable_ai_face_detection": true,
+    "cascade_path": "models/haarcascade_frontalface_default.xml",
+    "tflite_model_path": "models/frontal_face_classifier.tflite"
   },
   "server": {
     "host": "0.0.0.0",

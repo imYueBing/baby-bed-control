@@ -44,6 +44,10 @@ def parse_args():
                         help='仅测试摄像头，不启动完整系统')
     parser.add_argument('--no-arduino', action='store_true',  # <--- 确保这行在 app.py 的 parse_args 中
                         help='不使用Arduino控制器，以仅相机模式运行')
+    parser.add_argument('--enable-face-detection', action='store_true',
+                        help='启用AI人脸识别功能 (覆盖config.json的设置)')
+    parser.add_argument('--disable-face-detection', action='store_true',
+                        help='禁用AI人脸识别功能 (覆盖config.json的设置)')
     return parser.parse_args()
 
 def setup(args):
@@ -71,9 +75,22 @@ def setup(args):
 
     # 初始化 摄像头管理器
     try:
+        # 决定是否启用AI人脸识别，命令行参数优先于配置文件
+        enable_ai_detection_config = config.get('camera', 'enable_ai_face_detection', False)
+        if args.enable_face_detection:
+            final_enable_ai_detection = True
+        elif args.disable_face_detection:
+            final_enable_ai_detection = False
+        else:
+            final_enable_ai_detection = enable_ai_detection_config
+
         camera_manager = CameraManager(
             resolution=config.get('camera', 'resolution', [640, 480]),
-            framerate=config.get('camera', 'framerate', 30)
+            framerate=config.get('camera', 'framerate', 30),
+            use_picamera=config.get('camera', 'use_picamera', True),
+            enable_ai_face_detection=final_enable_ai_detection, # 使用最终确定的值
+            cascade_path=config.get('camera', 'cascade_path', 'models/haarcascade_frontalface_default.xml'),
+            tflite_model_path=config.get('camera', 'tflite_model_path', 'models/frontal_face_classifier.tflite')
         )
         logger.info("摄像头管理器初始化成功")
     except Exception as e:
