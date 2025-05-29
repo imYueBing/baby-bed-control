@@ -50,10 +50,7 @@ class BaseArduinoController:
                 timeout=self.timeout
             )
             
-            # 等待Arduino重置
             time.sleep(2)
-            
-            # 刷新输入缓冲区
             self.serial.flushInput()
             
             logger.info(f"已连接到Arduino: {self.port}")
@@ -74,7 +71,10 @@ class BaseArduinoController:
             self.get_system_status()
             
         except serial.SerialException as e:
-            logger.error(f"无法连接到Arduino: {e}")
+            logger.error(f"无法连接到Arduino (端口: {self.port}, 波特率: {self.baud_rate}): 详细错误: {e}")
+            self.is_connected = False
+        except Exception as ex:
+            logger.error(f"连接Arduino时发生意外错误 (端口: {self.port}): {ex}", exc_info=True)
             self.is_connected = False
     
     def reconnect(self):
