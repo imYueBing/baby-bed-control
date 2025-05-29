@@ -2,7 +2,7 @@ import serial
 import time
 
 # !! 重要 !! 将此处的 PORT 和 BAUDRATE 修改为您实际用于 minicom 并成功连接的值
-PORT = "/dev/ttyUSB0"  # 或者您的 Arduino 实际端口，例如 /dev/ttyACM0
+PORT = "/dev/ttyACM0"  # 或者您的 Arduino 实际端口，例如 /dev/ttyACM0
 BAUDRATE = 9600
 TIMEOUT = 1
 

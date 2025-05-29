@@ -111,7 +111,7 @@ AI 얼굴 인식 기능은 `config/config.json` 파일의 `enable_ai_face_detect
 **예시 조합:** Arduino 없이 시스템을 시작하고, 로컬 카메라 디버그 창을 열고, AI 얼굴 인식을 강제로 활성화합니다:
 ```bash
 python3 app.py --no-arduino --debug-camera --enable-face-detection
-```
+   ```
 
 ## 하드웨어 연결
 

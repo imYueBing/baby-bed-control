@@ -195,7 +195,7 @@ class CameraManager:
             cv2.putText(frame_to_process, prob_text, (x, y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         return frame_to_process
-
+    
     def _capture_loop(self):
         """捕获视频帧的循环"""
         while self.is_running and self.camera:

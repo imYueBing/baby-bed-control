@@ -113,7 +113,7 @@ AI人脸识别功能默认是否启用取决于 `config/config.json` 文件中 `
 **组合示例：** 以无Arduino模式启动，打开本地摄像头调试窗口，并强制启用AI人脸识别：
 ```bash
 python3 app.py --no-arduino --debug-camera --enable-face-detection
-```
+   ```
 
 ## 硬件连接
 

@@ -1,6 +1,6 @@
 {
   "arduino": {
-    "port": "/dev/ttyUSB0",
+    "port": "/dev/ttyACM0",
     "baud_rate": 9600
   },
   "camera": {
