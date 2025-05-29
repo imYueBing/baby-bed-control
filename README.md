@@ -48,8 +48,70 @@
 3. 애플리케이션 시작:
    ```
    python app.py
-
    ```
+
+## 다양한 실행 모드
+
+프로젝트는 다양한 모드로 실행할 수 있는 명령줄 옵션을 제공합니다.
+
+### 1. 전체 시스템 시작 (기본값)
+
+모든 모듈(Arduino, 카메라, API 서버)을 활성화하여 전체 시스템을 시작합니다.
+
+```bash
+python3 app.py
+```
+
+### 2. 카메라 모듈만 테스트
+
+다른 시스템 구성 요소를 초기화하지 않고 카메라만 시작하고 로컬 디버그 창에 화면을 표시합니다. 이 모드는 카메라 하드웨어 및 기본 캡처 기능을 빠르게 테스트하는 데 유용합니다.
+
+```bash
+python3 app.py --only-camera
+```
+
+### 3. Arduino 없이 시스템 시작 (카메라 및 API 서버)
+
+Arduino 컨트롤러를 제외한 시스템(카메라, API 서버)을 시작합니다. Arduino가 연결되지 않았거나 해당 기능을 테스트할 필요가 없을 때 유용합니다.
+
+```bash
+python3 app.py --no-arduino
+```
+
+### 4. 로컬 카메라 디버그 창 활성화하여 전체 시스템 시작
+
+전체 시스템을 시작하고 로컬 화면에 카메라 피드를 표시하는 디버그 창을 추가로 엽니다. API를 통해 스트리밍되는 것과 동일한 화면을 로컬에서 직접 모니터링하는 데 도움이 됩니다.
+
+```bash
+python3 app.py --debug-camera
+```
+
+창 이름을 사용자 지정할 수도 있습니다:
+```bash
+python3 app.py --debug-camera --debug-window-name "내 카메라 피드"
+```
+
+### 5. AI 얼굴 인식 제어
+
+AI 얼굴 인식 기능은 `config/config.json` 파일의 `enable_ai_face_detection` 설정을 통해 기본적으로 활성화/비활성화할 수 있습니다.
+
+명령줄 인수를 사용하여 이 설정을 재정의할 수 있습니다:
+
+- **AI 얼굴 인식 활성화하여 시작:**
+  ```bash
+  python3 app.py --enable-face-detection
+  ```
+  (전체 시스템과 함께 AI를 활성화합니다. `--debug-camera` 또는 `--no-arduino`와 같은 다른 플래그와 결합할 수 있습니다.)
+
+- **AI 얼굴 인식 비활성화하여 시작:**
+  ```bash
+  python3 app.py --disable-face-detection
+  ```
+
+**예시 조합:** Arduino 없이 시스템을 시작하고, 로컬 카메라 디버그 창을 열고, AI 얼굴 인식을 강제로 활성화합니다:
+```bash
+python3 app.py --no-arduino --debug-camera --enable-face-detection
+```
 
 ## 하드웨어 연결
 
