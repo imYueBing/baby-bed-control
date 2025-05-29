@@ -48,11 +48,29 @@ class BaseArduinoController:
                 port=self.port,
                 baudrate=self.baud_rate,
                 timeout=self.timeout
+                # 尝试添加 dsrdtr=False 如果遇到连接问题
+                # dsrdtr=False 
             )
             
-            time.sleep(2)
-            self.serial.flushInput()
+            # 对于许多Arduino板，打开串口会导致复位。
+            # 这个延迟是为了给Arduino足够的时间来完成复位并准备好接收数据。
+            logger.info("等待Arduino板复位和初始化 (通常需要1-2秒)...")
+            time.sleep(2) 
             
+            self.serial.flushInput() # 清除任何在Python准备好之前Arduino可能发送的初始数据
+            
+            # 尝试读取Arduino的初始就绪消息 (可选)
+            # 这有助于确认双向通信，但如果Arduino没有发送或者被flushInput清除了也不算严重错误
+            try:
+                initial_message = self.serial.readline().decode('utf-8').strip()
+                if initial_message:
+                    logger.info(f"从Arduino收到初始消息: {initial_message}")
+                else:
+                    logger.debug("未收到Arduino的初始就绪消息 (可能已被清除或未发送)。")
+            except Exception as e:
+                logger.debug(f"读取初始消息时出错 (可忽略): {e}")
+
+
             logger.info(f"已连接到Arduino: {self.port}")
             self.is_connected = True
             
@@ -108,7 +126,8 @@ class BaseArduinoController:
                 if self.serial.in_waiting > 0:
                     line = self.serial.readline().decode('utf-8').strip()
                     if line:
-                        self._process_response(line)
+                        logger.debug(f"从Arduino原始接收: {line}") # 添加原始数据日志
+                        self._process_response(line) # 直接将原始行传递给处理函数
             except serial.SerialException as e:
                 logger.error(f"串行读取错误: {e}")
                 self.is_connected = False
@@ -120,25 +139,23 @@ class BaseArduinoController:
             time.sleep(0.01)
     
     def _command_loop(self):
-        """命令处理循环"""
+        """命令处理循环 - 从队列获取命令并发送"""
         while self.running and self.serial and self.serial.is_open:
             try:
                 # 从队列获取命令（阻塞，等待1秒）
                 try:
-                    command = self.command_queue.get(timeout=1)
+                    # command_to_send 现在应该是完整的字符串，包含 \\n
+                    command_to_send = self.command_queue.get(timeout=1) 
                 except queue.Empty:
                     continue
                 
                 # 发送命令
                 if self.serial and self.serial.is_open:
-                    self.serial.write(f"{command}\n".encode('utf-8'))
-                    logger.debug(f"发送命令: {command}")
+                    self.serial.write(command_to_send.encode('utf-8')) # 直接编码发送
+                    logger.debug(f"已发送命令到Arduino: {command_to_send.strip()}") # 记录剥离了换行符的命令
                 
-                # 标记任务完成
                 self.command_queue.task_done()
-                
-                # 短暂等待，避免命令发送过快
-                time.sleep(0.1)
+                time.sleep(0.1) # 短暂等待，避免命令发送过快
                 
             except serial.SerialException as e:
                 logger.error(f"串行写入错误: {e}")
@@ -147,58 +164,50 @@ class BaseArduinoController:
             except Exception as e:
                 logger.error(f"命令循环中的错误: {e}")
     
-    def _process_response(self, response):
+    def _process_response(self, response_line):
         """
-        处理来自Arduino的响应
-        子类应重写此方法以处理特定响应
+        处理来自Arduino的响应 (简化为直接处理字符串)
+        子类可以覆盖此方法以进行更具体的处理。
         """
-        try:
-            # 尝试解析为JSON
-            data = json.loads(response)
-            logger.debug(f"收到响应: {data}")
-            
-            # 具体的响应处理由子类实现
-            self._handle_response(data)
-            
-        except json.JSONDecodeError:
-            # 非JSON响应
-            logger.debug(f"收到非JSON响应: {response}")
+        logger.info(f"Arduino响应: {response_line}")
+        # 在这个简化的版本中，我们只是记录响应。
+        # 在实际应用中，您会在这里解析响应并触发相应的事件或更新状态。
+        # 例如，您可以检查 response_line.startswith("CONFIRMED:") 等
         
-        except Exception as e:
-            logger.error(f"处理响应时出错: {e}")
-    
-    def _handle_response(self, data):
+        # 为了让子控制器可以处理，我们仍然调用一个可被覆盖的方法
+        self._handle_specific_response(response_line)
+
+    def _handle_specific_response(self, response_line):
         """
-        处理特定类型的响应
-        应由子类重写
+        由子类实现以处理特定响应。
+        """
+        pass # 子类将实现这个
+
+    def send_command(self, command_string): # 修改参数为简单字符串
+        """
+        发送简单的字符串命令到Arduino，并确保以换行符结束。
         
         Args:
-            data (dict): 解析后的JSON响应
-        """
-        pass
-    
-    def send_command(self, command_type, **kwargs):
-        """
-        发送命令到Arduino
-        
-        Args:
-            command_type (str): 命令类型
-            **kwargs: 命令参数
+            command_string (str): 要发送的命令字符串 (例如 "UP", "DOWN")
         
         Returns:
-            bool: 命令是否已发送
+            bool: 命令是否已成功放入发送队列
         """
         if not self.is_connected:
-            logger.warning(f"Arduino未连接，无法发送命令: {command_type}")
+            logger.warning(f"Arduino未连接，无法发送命令: {command_string}")
             return False
         
-        command_data = {'command': command_type}
-        command_data.update(kwargs)
-        
-        command = json.dumps(command_data)
-        self.command_queue.put(command)
+        # 确保命令以换行符结束
+        if not command_string.endswith('\\n'):
+            command_to_send = command_string + '\\n'
+        else:
+            command_to_send = command_string
+            
+        self.command_queue.put(command_to_send) # 将修改后的命令放入队列
+        # 注意：_command_loop 会从队列中取出并 .encode('utf-8') 发送
+        logger.debug(f"命令 '{command_string}' 已放入发送队列。")
         return True
     
     def get_system_status(self):
-        """获取系统状态"""
-        return self.send_command("SYSTEM_STATUS") 
+        """获取系统状态 (简化测试，发送一个特定命令)"""
+        return self.send_command("GET_STATUS\\n") # 示例，Arduino端需要对应处理 

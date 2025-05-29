@@ -6,21 +6,13 @@
 """
 
 import logging
-from enum import Enum
 from .base_controller import BaseArduinoController
 
 # 配置日志
 logger = logging.getLogger(__name__)
 
-# 命令类型枚举
-class BedCommandType(Enum):
-    BED_UP = "BED_UP"
-    BED_DOWN = "BED_DOWN"
-    BED_STOP = "BED_STOP"
-    BED_HEIGHT = "BED_HEIGHT"
-
 class BedController(BaseArduinoController):
-    """床体控制器类，负责控制婴儿床的升降"""
+    """简化的床体控制器，用于发送UP/DOWN命令并处理简单响应"""
     
     def __init__(self, port, baud_rate=9600, timeout=1):
         """
@@ -32,34 +24,18 @@ class BedController(BaseArduinoController):
             timeout (float): 读取超时（秒）
         """
         super().__init__(port, baud_rate, timeout)
-        
-        # 床体当前高度
-        self.current_bed_height = None
+        self.last_bed_response = None
+        self.current_bed_height = 0 # Add for compatibility if needed by ArduinoController
     
-    def _handle_response(self, data):
-        """
-        处理来自Arduino的响应
-        
-        Args:
-            data (dict): 解析后的JSON响应
-        """
-        # 检查响应类型
-        if 'type' in data:
-            if data['type'] == 'BED_HEIGHT':
-                # 处理床高数据
-                if 'value' in data:
-                    self.current_bed_height = data['value']
-                    logger.debug(f"床体当前高度: {self.current_bed_height}")
-            
-            elif data['type'] == 'BED_CONTROL':
-                # 处理床控制响应
-                logger.debug(f"床体控制响应: {data}")
-            
-            elif data['type'] == 'SYSTEM_STATUS':
-                # 处理系统状态
-                if 'bed_height' in data:
-                    self.current_bed_height = data['bed_height']
-                    logger.debug(f"床体当前高度: {self.current_bed_height}")
+    def _handle_specific_response(self, response_line):
+        """处理来自Arduino的特定于床的响应"""
+        if response_line.startswith("CONFIRMED:"):
+            self.last_bed_response = response_line
+            logger.info(f"BedController 确认: {response_line}")
+            # Potentially update internal state based on response, e.g., if it was CONFIRMED: UP
+        elif response_line.startswith("UNKNOWN_CMD:"):
+            logger.warning(f"BedController 收到未知命令回复: {response_line}")
+        # Add more specific parsing if Arduino sends back height or other status
     
     def bed_up(self):
         """
@@ -68,8 +44,8 @@ class BedController(BaseArduinoController):
         Returns:
             bool: 命令是否已发送
         """
-        logger.info("发送床体上升命令")
-        return self.send_command(BedCommandType.BED_UP.value)
+        logger.info("发送 BED_UP 命令 (简单字符串)")
+        return self.send_command("UP")
     
     def bed_down(self):
         """
@@ -78,27 +54,20 @@ class BedController(BaseArduinoController):
         Returns:
             bool: 命令是否已发送
         """
-        logger.info("发送床体下降命令")
-        return self.send_command(BedCommandType.BED_DOWN.value)
+        logger.info("发送 BED_DOWN 命令 (简单字符串)")
+        return self.send_command("DOWN")
     
     def bed_stop(self):
-        """
-        停止床体移动
-        
-        Returns:
-            bool: 命令是否已发送
-        """
-        logger.info("发送床体停止命令")
-        return self.send_command(BedCommandType.BED_STOP.value)
+        logger.info("发送 BED_STOP 命令 (简单字符串，测试Arduino可能不响应)")
+        return self.send_command("STOP")
     
-    def get_bed_height(self):
-        """
-        获取床体当前高度
-        
-        Returns:
-            int or None: 床体当前高度，如果未知则为None
-        """
-        self.send_command(BedCommandType.BED_HEIGHT.value)
-        
-        # 返回最后已知的高度（异步更新）
+    def get_last_response(self):
+        return self.last_bed_response
+
+    def get_bed_height(self): # Add for compatibility
+        """获取床体当前高度 (简化测试中返回模拟值或最后已知状态)"""
+        # For this simple test, Arduino doesn't send height. 
+        # We could have it request height via a command if needed.
+        # Or, if the confirmation implies a state change, update self.current_bed_height
+        logger.debug(f"BedController: get_bed_height() called, returning {self.current_bed_height} (simulated/last known)")
         return self.current_bed_height 
