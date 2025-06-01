@@ -7,19 +7,25 @@
 
 import logging
 from datetime import datetime
-from flask_socketio import emit
+from flask_socketio import emit, SocketIO
+from mock_arduino_controller import MockArduinoController  # 导入模拟类
 
 # 配置日志
 logger = logging.getLogger(__name__)
 
-def register_heart_rate_socketio_events(socketio, arduino_controller):
+def register_heart_rate_socketio_events(socketio, arduino_controller=None):
     """
     注册心率相关的WebSocket事件处理程序
     
     Args:
         socketio: SocketIO实例
-        arduino_controller: Arduino控制器实例
+        arduino_controller: Arduino控制器实例（可选）
     """
+    
+    # 如果没有提供 Arduino 控制器，使用模拟控制器
+    if arduino_controller is None:
+        logger.info("Arduino 控制器不可用，使用模拟控制器")
+        arduino_controller = MockArduinoController()
     
     def heart_rate_callback(heart_rate):
         """
@@ -45,4 +51,10 @@ def register_heart_rate_socketio_events(socketio, arduino_controller):
             'heart_rate': heart_rate,
             'timestamp': datetime.now().isoformat(),
             'status': 'ok' if heart_rate is not None else 'error'
-        }) 
+        })
+
+# 初始化 SocketIO
+socketio = SocketIO()
+
+# 注册 WebSocket 事件，假设没有实际的 Arduino 控制器
+register_heart_rate_socketio_events(socketio) 
