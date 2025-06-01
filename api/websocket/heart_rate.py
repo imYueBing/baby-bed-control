@@ -8,7 +8,7 @@
 import logging
 from datetime import datetime
 from flask_socketio import emit
-from mock_arduino import MockArduinoController
+from .mock_arduino import MockArduinoController
 
 
 logger = logging.getLogger(__name__)
