@@ -25,6 +25,9 @@ from .websocket.bed import register_bed_socketio_events
 from .websocket.heart_rate import register_heart_rate_socketio_events
 from .websocket.video import register_video_socketio_events
 
+from .mock_arduino import MockArduinoController
+
+
 # 配置日志
 logger = logging.getLogger(__name__)
 
@@ -227,16 +230,19 @@ def setup(args=None):
     camera_manager = None
     api_server = None
 
-    # 初始化 Arduino 控制器（如果未指定--no-arduino）
+    # 优先初始化真实 Arduino 控制器（如果未指定--no-arduino）
     if not (args and args.no_arduino):
         try:
             arduino_controller = ArduinoController(
                 port=config.get('arduino', 'port'),
                 baud_rate=config.get('arduino', 'baud_rate', 9600)
             )
-            logger.info("Arduino 控制器初始化成功")
+            logger.info("真实 Arduino 控制器初始化成功")
         except Exception as e:
-            logger.warning(f"Arduino 初始化失败: {e}")
+            logger.warning(f"真实 Arduino 初始化失败: {e}，切换到模拟 Arduino")
+            # 初始化模拟 Arduino
+            arduino_controller = MockArduinoController()
+            logger.info("模拟 Arduino 控制器初始化成功")
     else:
         logger.info("以仅相机模式运行，不使用Arduino控制器")
 
@@ -253,7 +259,7 @@ def setup(args=None):
     # 初始化 API 服务器
     try:
         api_server = APIServer(
-            arduino_controller=arduino_controller,  # 可能为None
+            arduino_controller=arduino_controller,  # 可能为None或模拟控制器
             camera_manager=camera_manager,
             host=config.get('server', 'host', '0.0.0.0'),
             port=config.get('server', 'port', 5000)
@@ -263,7 +269,7 @@ def setup(args=None):
         logger.error(f"API 服务器初始化失败: {e}")
         raise
 
-    return arduino_controller, camera_manager, api_server 
+    return arduino_controller, camera_manager, api_server
 
 def main():
     """主函数"""
