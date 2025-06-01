@@ -25,7 +25,8 @@ from .websocket.bed import register_bed_socketio_events
 from .websocket.heart_rate import register_heart_rate_socketio_events
 from .websocket.video import register_video_socketio_events
 
-from .mock_arduino import MockArduinoController
+from .websocket.mock_arduino import MockArduinoController
+
 
 
 # 配置日志
