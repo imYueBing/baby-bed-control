@@ -198,8 +198,8 @@ class BaseArduinoController:
             return False
         
         # 确保命令以换行符结束
-        if not command_string.endswith('\\n'):
-            command_to_send = command_string + '\\n'
+        if not command_string.endswith('\n'):
+            command_to_send = command_string + '\n'
         else:
             command_to_send = command_string
             
