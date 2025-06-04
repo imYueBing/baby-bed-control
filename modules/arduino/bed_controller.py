@@ -45,7 +45,7 @@ class BedController(BaseArduinoController):
             bool: 命令是否已发送
         """
         logger.info("Send the BED_UP command (simple string)")
-        return self.send_command("UP")
+        return self.send_command("UP\n")
     
     def bed_down(self):
         """
@@ -55,7 +55,7 @@ class BedController(BaseArduinoController):
             bool: 命令是否已发送
         """
         logger.info("Send the BED_DOWN command (simple string)")
-        return self.send_command("DOWN")
+        return self.send_command("DOWN\n")
     
     def bed_stop(self):
         logger.info("发送 BED_STOP 命令 (简单字符串，测试Arduino可能不响应)")
