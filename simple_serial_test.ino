@@ -5,7 +5,7 @@
  * 1. 床体升降控制
  * 2. 心率监测和数据传输
  *
- * 通信协议：
+ * 通信协议
  * - 接收命令：UP, DOWN, STOP, GET_HEART_RATE, GET_STATUS
  * - 发送响应：CONFIRMED:<命令>, HEART_RATE_DATA:<值>, UNKNOWN_CMD:<命令>
  */
