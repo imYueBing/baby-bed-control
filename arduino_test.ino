@@ -65,6 +65,7 @@ void readSerialCommand()
   while (Serial.available() > 0)
   {
     char inChar = (char)Serial.read();
+    Serial.print(inChar);
 
     // 如果收到换行符，表示命令结束
     if (inChar == '\n')
