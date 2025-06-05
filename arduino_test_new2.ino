@@ -83,12 +83,20 @@ void readSerialCommand()
     {
       commandComplete = true;
       Serial.println("Command complete");
+      // 打印完整接收到的命令
+      Serial.print("Complete command received: '");
+      Serial.print(inputBuffer);
+      Serial.println("'");
       break;
     }
     else
     {
       // 添加字符到缓冲区
       inputBuffer += inChar;
+      // 打印当前缓冲区内容
+      Serial.print("Current buffer: '");
+      Serial.print(inputBuffer);
+      Serial.println("'");
     }
   }
 }

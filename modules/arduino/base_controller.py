@@ -144,15 +144,17 @@ class BaseArduinoController:
             try:
                 # 从队列获取命令（阻塞，等待1秒）
                 try:
-                    # command_to_send 现在应该是完整的字符串，包含 \\n
+                    # command_to_send 现在应该是完整的字符串，包含 \n
                     command_to_send = self.command_queue.get(timeout=1) 
                 except queue.Empty:
                     continue
                 
                 # 发送命令
                 if self.serial and self.serial.is_open:
-                    self.serial.write(command_to_send.encode('utf-8')) # 直接编码发送
-                    logger.debug(f"已发送命令到Arduino: {command_to_send.strip()}") # 记录剥离了换行符的命令
+                    encoded_command = command_to_send.encode('utf-8')
+                    self.serial.write(encoded_command)
+                    logger.debug(f"已发送命令到Arduino: {command_to_send.strip()}")
+                    logger.debug(f"发送的字节: {[b for b in encoded_command]}")
                 
                 self.command_queue.task_done()
                 time.sleep(0.1) # 短暂等待，避免命令发送过快
@@ -210,4 +212,4 @@ class BaseArduinoController:
     
     def get_system_status(self):
         """获取系统状态 (简化测试，发送一个特定命令)"""
-        return self.send_command("GET_STATUS\\n") # 示例，Arduino端需要对应处理 
+        return self.send_command("GET_STATUS") # 修改为单个命令，send_command会自动添加换行符 
