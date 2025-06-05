@@ -115,6 +115,9 @@ void processCommand(String command)
 {
   command.trim(); // 去除可能的空格
 
+  // 转换为大写，使命令处理不区分大小写
+  command.toUpperCase();
+
   Serial.print("Processing command: ");
   Serial.println(command);
 
