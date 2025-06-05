@@ -59,11 +59,14 @@ void loop()
   if (commandComplete)
   {
     processCommand(inputBuffer);
+    // 确保清空缓冲区并重置标志
     inputBuffer = "";
     commandComplete = false;
+    // 添加额外的调试信息
+    Serial.println("缓冲区已清空，等待新命令");
   }
 
-  // 定期更新心率数据（模拟或实际读取）
+  // 定期更新心率数据
   updateHeartRate();
 }
 
@@ -115,8 +118,16 @@ void processCommand(String command)
 {
   command.trim(); // 去除可能的空格
 
+  Serial.print("原始命令: '");
+  Serial.print(command);
+  Serial.println("'");
+
   // 转换为大写，使命令处理不区分大小写
   command.toUpperCase();
+
+  Serial.print("转换后命令: '");
+  Serial.print(command);
+  Serial.println("'");
 
   Serial.print("Processing command: ");
   Serial.println(command);
@@ -125,6 +136,7 @@ void processCommand(String command)
   {
     // 升高床
     bedUp();
+    Serial.println("执行UP命令");
     Serial.println("CONFIRMED:UP");
   }
   else if (command == "DOWN")
@@ -162,6 +174,8 @@ void bedUp()
 {
   digitalWrite(BED_DOWN_PIN, LOW); // 确保下降引脚关闭
   digitalWrite(BED_UP_PIN, HIGH);  // 激活上升引脚
+  Serial.println("床体上升引脚已激活");
+  Serial.flush(); // 确保数据发送完成
 }
 
 // 降低床
