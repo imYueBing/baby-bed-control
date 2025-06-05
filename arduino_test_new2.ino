@@ -78,12 +78,11 @@ void readSerialCommand()
     Serial.print("Received: ");
     Serial.println(inChar);
 
-    // 如果收到换行符，表示命令结束
-    if (inChar == '\n')
+    // 如果收到换行符或回车符，表示命令结束
+    if (inChar == '\n' || inChar == '\r')
     {
       commandComplete = true;
       Serial.println("Command complete");
-      // 打印完整接收到的命令
       Serial.print("Complete command received: '");
       Serial.print(inputBuffer);
       Serial.println("'");
@@ -93,10 +92,20 @@ void readSerialCommand()
     {
       // 添加字符到缓冲区
       inputBuffer += inChar;
-      // 打印当前缓冲区内容
       Serial.print("Current buffer: '");
       Serial.print(inputBuffer);
       Serial.println("'");
+
+      // 检查是否已经有完整命令
+      // 如果缓冲区匹配特定命令，立即处理
+      if (inputBuffer == "UP" || inputBuffer == "DOWN" ||
+          inputBuffer == "STOP" || inputBuffer == "GET_HEART_RATE" ||
+          inputBuffer == "GET_STATUS")
+      {
+        Serial.println("命令匹配，无需等待换行符");
+        commandComplete = true;
+        break;
+      }
     }
   }
 }
