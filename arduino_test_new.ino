@@ -10,6 +10,8 @@
  * - 发送响应：CONFIRMED:<命令>, HEART_RATE_DATA:<值>, UNKNOWN_CMD:<命令>
  */
 
+#include <Arduino.h> // 添加 Arduino 库引用
+
 // 引脚定义
 const int BED_UP_PIN = 5;      // 床体上升控制引脚
 const int BED_DOWN_PIN = 6;    // 床体下降控制引脚
@@ -28,6 +30,12 @@ void setup()
 {
   // 初始化串口通信
   Serial.begin(9600);
+
+  // 等待串口连接（仅适用于某些 Arduino 板）
+  while (!Serial && millis() < 3000)
+  {
+    ; // 等待串口连接，但最多等待 3 秒
+  }
 
   // 配置引脚
   pinMode(BED_UP_PIN, OUTPUT);
@@ -65,12 +73,16 @@ void readSerialCommand()
   while (Serial.available() > 0)
   {
     char inChar = (char)Serial.read();
-    Serial.print(inChar);
+
+    // 调试：打印接收到的字符
+    Serial.print("Received: ");
+    Serial.println(inChar);
 
     // 如果收到换行符，表示命令结束
     if (inChar == '\n')
     {
       commandComplete = true;
+      Serial.println("Command complete");
       break;
     }
     else
@@ -85,6 +97,9 @@ void readSerialCommand()
 void processCommand(String command)
 {
   command.trim(); // 去除可能的空格
+
+  Serial.print("Processing command: ");
+  Serial.println(command);
 
   if (command == "UP")
   {
