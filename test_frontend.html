@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>婴儿床控制系统 - 前端测试</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .control-panel {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        background-color: #f9f9f9;
+      }
+      h2 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 18px;
+      }
+      button {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        margin: 5px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+      }
+      .status-panel {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        background-color: #f0f8ff;
+      }
+      .log-panel {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        height: 300px;
+        overflow-y: auto;
+        background-color: #f8f8f8;
+        font-family: monospace;
+      }
+      .log-entry {
+        margin: 5px 0;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+      }
+      .log-entry.error {
+        color: #ff0000;
+      }
+      .log-entry.success {
+        color: #008000;
+      }
+      .controls {
+        display: flex;
+        flex-direction: column;
+      }
+      .input-group {
+        margin-bottom: 10px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        width: 100%;
+      }
+      #heart-rate {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        margin: 15px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>婴儿床控制系统 - 前端测试</h1>
+
+      <div class="status-panel">
+        <h2>系统状态</h2>
+        <div id="connection-status">连接状态: 未连接</div>
+        <div id="heart-rate">心率: --</div>
+        <div id="bed-status">床体状态: 未知</div>
+      </div>
+
+      <div class="control-panel">
+        <div class="card">
+          <h2>API 设置</h2>
+          <div class="controls">
+            <div class="input-group">
+              <label for="api-host">API 主机:</label>
+              <input
+                type="text"
+                id="api-host"
+                value="localhost"
+                placeholder="例如: localhost 或 192.168.1.100"
+              />
+            </div>
+            <div class="input-group">
+              <label for="api-port">API 端口:</label>
+              <input type="number" id="api-port" value="5000" />
+            </div>
+            <button id="connect-btn">连接</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>床体控制</h2>
+          <div class="controls">
+            <button id="bed-up-btn" disabled>升高床</button>
+            <button id="bed-down-btn" disabled>降低床</button>
+            <button id="bed-stop-btn" disabled>停止</button>
+            <button id="get-height-btn" disabled>获取床体高度</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>操作日志</h2>
+        <div class="log-panel" id="log-panel"></div>
+      </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script>
+      // DOM元素
+      const connectBtn = document.getElementById('connect-btn')
+      const apiHost = document.getElementById('api-host')
+      const apiPort = document.getElementById('api-port')
+      const bedUpBtn = document.getElementById('bed-up-btn')
+      const bedDownBtn = document.getElementById('bed-down-btn')
+      const bedStopBtn = document.getElementById('bed-stop-btn')
+      const getHeightBtn = document.getElementById('get-height-btn')
+      const connectionStatus = document.getElementById('connection-status')
+      const heartRateDisplay = document.getElementById('heart-rate')
+      const bedStatusDisplay = document.getElementById('bed-status')
+      const logPanel = document.getElementById('log-panel')
+
+      // 状态变量
+      let isConnected = false
+      let socket = null
+      let heartRateInterval = null
+
+      // 日志函数
+      function log(message, type = 'info') {
+        const logEntry = document.createElement('div')
+        logEntry.className = `log-entry ${type}`
+        logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+        logPanel.appendChild(logEntry)
+        logPanel.scrollTop = logPanel.scrollHeight
+      }
+
+      // 连接到API服务器
+      connectBtn.addEventListener('click', () => {
+        const host = apiHost.value.trim()
+        const port = apiPort.value.trim()
+
+        if (!host || !port) {
+          log('主机名和端口不能为空', 'error')
+          return
+        }
+
+        const baseUrl = `http://${host}:${port}`
+
+        if (isConnected) {
+          // 断开现有连接
+          if (socket) {
+            socket.disconnect()
+            socket = null
+          }
+
+          if (heartRateInterval) {
+            clearInterval(heartRateInterval)
+            heartRateInterval = null
+          }
+
+          isConnected = false
+          updateUIState()
+          log('已断开连接')
+          return
+        }
+
+        // 测试HTTP API连接
+        fetch(`${baseUrl}/api/system/status`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`HTTP错误: ${response.status}`)
+            }
+            return response.json()
+          })
+          .then(data => {
+            log(`系统状态: ${JSON.stringify(data)}`, 'success')
+
+            // 连接WebSocket
+            connectWebSocket(baseUrl)
+
+            // 启动定期心率查询
+            heartRateInterval = setInterval(() => {
+              fetch(`${baseUrl}/api/heart-rate`)
+                .then(response => response.json())
+                .then(data => {
+                  if (data.status === 'ok') {
+                    heartRateDisplay.textContent = `心率: ${
+                      data.heart_rate || '--'
+                    } BPM`
+                  }
+                })
+                .catch(error => {
+                  log(`获取心率错误: ${error.message}`, 'error')
+                })
+            }, 2000)
+
+            isConnected = true
+            updateUIState()
+          })
+          .catch(error => {
+            log(`连接失败: ${error.message}`, 'error')
+          })
+      })
+
+      // 连接WebSocket
+      function connectWebSocket(baseUrl) {
+        try {
+          socket = io(baseUrl)
+
+          socket.on('connect', () => {
+            log('WebSocket已连接', 'success')
+            connectionStatus.textContent = '连接状态: 已连接'
+          })
+
+          socket.on('disconnect', () => {
+            log('WebSocket已断开连接')
+            connectionStatus.textContent = '连接状态: 已断开'
+          })
+
+          socket.on('connect_error', error => {
+            log(`WebSocket连接错误: ${error.message}`, 'error')
+            connectionStatus.textContent = '连接状态: 连接失败'
+          })
+
+          socket.on('welcome', data => {
+            log(`服务器欢迎: ${data.message}`, 'success')
+          })
+
+          socket.on('heart_rate_update', data => {
+            log(`心率更新: ${JSON.stringify(data)}`)
+            if (data.status === 'ok') {
+              heartRateDisplay.textContent = `心率: ${
+                data.heart_rate || '--'
+              } BPM`
+            }
+          })
+
+          socket.on('bed_status_update', data => {
+            log(`床体状态更新: ${JSON.stringify(data)}`)
+            if (data.status === 'ok') {
+              const bedHeight =
+                data.bed_height !== undefined ? data.bed_height : '未知'
+              bedStatusDisplay.textContent = `床体状态: 高度=${bedHeight}`
+            }
+          })
+
+          // 请求初始状态
+          socket.emit('request_heart_rate')
+          socket.emit('request_bed_status')
+        } catch (error) {
+          log(`WebSocket初始化错误: ${error.message}`, 'error')
+        }
+      }
+
+      // 床体控制按钮事件
+      bedUpBtn.addEventListener('click', () => {
+        sendBedCommand('up')
+      })
+
+      bedDownBtn.addEventListener('click', () => {
+        sendBedCommand('down')
+      })
+
+      bedStopBtn.addEventListener('click', () => {
+        sendBedCommand('stop')
+      })
+
+      getHeightBtn.addEventListener('click', () => {
+        const baseUrl = `http://${apiHost.value.trim()}:${apiPort.value.trim()}`
+
+        fetch(`${baseUrl}/api/bed/height`)
+          .then(response => response.json())
+          .then(data => {
+            log(`床体高度: ${JSON.stringify(data)}`)
+            if (data.status === 'ok') {
+              bedStatusDisplay.textContent = `床体状态: 高度=${data.bed_height}`
+            }
+          })
+          .catch(error => {
+            log(`获取床体高度错误: ${error.message}`, 'error')
+          })
+      })
+
+      // 发送床体控制命令
+      function sendBedCommand(command) {
+        const baseUrl = `http://${apiHost.value.trim()}:${apiPort.value.trim()}`
+
+        fetch(`${baseUrl}/api/bed/${command}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            log(`${command} 命令响应: ${JSON.stringify(data)}`)
+          })
+          .catch(error => {
+            log(`${command} 命令错误: ${error.message}`, 'error')
+          })
+      }
+
+      // 更新UI状态
+      function updateUIState() {
+        if (isConnected) {
+          connectBtn.textContent = '断开连接'
+          bedUpBtn.disabled = false
+          bedDownBtn.disabled = false
+          bedStopBtn.disabled = false
+          getHeightBtn.disabled = false
+          apiHost.disabled = true
+          apiPort.disabled = true
+        } else {
+          connectBtn.textContent = '连接'
+          bedUpBtn.disabled = true
+          bedDownBtn.disabled = true
+          bedStopBtn.disabled = true
+          getHeightBtn.disabled = true
+          apiHost.disabled = false
+          apiPort.disabled = false
+          connectionStatus.textContent = '连接状态: 未连接'
+          heartRateDisplay.textContent = '心率: --'
+          bedStatusDisplay.textContent = '床体状态: 未知'
+        }
+      }
+
+      // 初始化UI
+      updateUIState()
+    </script>
+  </body>
+</html>

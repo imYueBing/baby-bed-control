@@ -29,15 +29,41 @@ def init_heart_rate_api(arduino_controller):
     @heart_rate_api.route('/api/heart-rate', methods=['GET'])
     def get_heart_rate():
         """获取心率"""
+        logger.info("收到心率API请求")
+        
         if arduino_controller: # 检查 arduino_controller 是否为 None
-            heart_rate = arduino_controller.get_heart_rate()
-            return jsonify({
-                'status': 'ok' if heart_rate is not None else 'error',
-                'heart_rate': heart_rate,
-                'timestamp': datetime.now().isoformat(),
-                'message': '获取心率成功' if heart_rate is not None else 'Arduino未连接或数据不可用'
-            })
+            try:
+                heart_rate = arduino_controller.get_heart_rate()
+                logger.info(f"获取到心率值: {heart_rate}")
+                
+                # 如果心率为None，多尝试几次
+                retry_count = 0
+                while heart_rate is None and retry_count < 3:
+                    logger.warning(f"心率为空，尝试重新获取 (尝试 {retry_count+1}/3)")
+                    heart_rate = arduino_controller.get_heart_rate()
+                    retry_count += 1
+                
+                response = {
+                    'status': 'ok' if heart_rate is not None else 'error',
+                    'heart_rate': heart_rate,
+                    'timestamp': datetime.now().isoformat(),
+                    'message': '获取心率成功' if heart_rate is not None else 'Arduino未连接或数据不可用',
+                    'retry_count': retry_count
+                }
+                
+                logger.info(f"心率API响应: {response}")
+                return jsonify(response)
+                
+            except Exception as e:
+                logger.error(f"获取心率时发生错误: {e}", exc_info=True)
+                return jsonify({
+                    'status': 'error',
+                    'heart_rate': None,
+                    'timestamp': datetime.now().isoformat(),
+                    'message': f'获取心率时发生错误: {str(e)}'
+                }), 500
         else:
+            logger.warning("心率API请求失败: Arduino控制器不可用")
             return jsonify({ # Arduino 不可用时的响应
                 'status': 'error',
                 'heart_rate': None,

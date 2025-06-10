@@ -135,3 +135,50 @@ python3 app.py --no-arduino --debug-camera --enable-face-detection
 ## 라이선스
 
 MIT 
+
+## Troubleshooting
+
+If you encounter issues with the system, here are some helpful tools for diagnosing problems:
+
+### Testing the Arduino Communication
+
+Use the `arduino_test_direct.py` script to test direct communication with the Arduino:
+
+```bash
+python arduino_test_direct.py --port /dev/ttyACM0 --baud 9600
+```
+
+This will send a series of test commands to the Arduino and display the responses.
+
+### Testing the API Endpoints
+
+To test if the API server is working correctly, use the `test_frontend_api.py` script:
+
+```bash
+python test_frontend_api.py --host localhost --port 5000 --test-websocket
+```
+
+This script will test all the HTTP API endpoints and WebSocket connections.
+
+### Testing the Frontend Integration
+
+A simple HTML-based test interface is provided to test frontend integration:
+
+1. Start the API server:
+   ```bash
+   python app.py
+   ```
+
+2. Open the `test_frontend.html` file in a web browser
+3. Enter the API host and port (default: localhost:5000)
+4. Click "Connect" to test the API and WebSocket connections
+5. Use the bed control buttons to test API commands
+
+If the frontend tests work but your actual frontend application is having issues, the problem may be related to:
+
+- CORS configuration
+- API endpoint format mismatches
+- WebSocket connection parameters
+- Network connectivity between your frontend and the Raspberry Pi
+
+Check the browser developer console for detailed error messages that can help identify the specific issue. 

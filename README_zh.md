@@ -137,3 +137,78 @@ python3 app.py --no-arduino --debug-camera --enable-face-detection
 ## 许可证
 
 MIT 
+
+## 故障排除
+
+如果您遇到系统问题，以下是一些有助于诊断问题的工具：
+
+### 心率功能故障排除
+
+如果您的心率检测功能出现问题，而床控制功能正常工作，请使用以下专用工具进行诊断：
+
+```bash
+# 测试Arduino心率通信
+python test_arduino_heart_rate.py --port /dev/ttyACM0 --baud 9600 --debug
+
+# 测试HTTP心率API端点 (简化版)
+python test_http_heart_rate.py --host localhost --port 5000 --iterations 5
+
+# 测试完整的心率API (包括WebSocket)
+python test_heart_rate_api.py --host localhost --port 5000 --iterations 5
+```
+
+这些工具会帮助您识别问题所在：
+
+1. 如果`test_arduino_heart_rate.py`成功但`test_http_heart_rate.py`失败，问题可能在于API层。
+2. 如果两者都失败，问题可能在于Arduino代码或硬件连接。
+
+常见心率问题的解决方案：
+
+- **Arduino不响应GET_HEART_RATE命令**：确保Arduino代码中正确实现了`sendHeartRate()`函数。
+- **心率值始终为空**：检查心率传感器连接和Arduino的模拟引脚配置。
+- **前端无法获取心率**：检查网络连接，确保正确处理了API响应格式。
+
+查看我们更新后的代码，它增加了额外的错误处理和日志记录，以帮助诊断和修复心率检测问题。
+
+### 测试Arduino通信
+
+使用 `arduino_test_direct.py` 脚本测试与Arduino的直接通信：
+
+```bash
+python arduino_test_direct.py --port /dev/ttyACM0 --baud 9600
+```
+
+这将向Arduino发送一系列测试命令并显示响应。
+
+### 测试API端点
+
+要测试API服务器是否正常工作，请使用 `test_frontend_api.py` 脚本：
+
+```bash
+python test_frontend_api.py --host localhost --port 5000 --test-websocket
+```
+
+此脚本将测试所有HTTP API端点和WebSocket连接。
+
+### 测试前端集成
+
+提供了一个简单的基于HTML的测试界面来测试前端集成：
+
+1. 启动API服务器：
+   ```bash
+   python app.py
+   ```
+
+2. 在Web浏览器中打开 `test_frontend.html` 文件
+3. 输入API主机和端口（默认：localhost:5000）
+4. 点击"连接"测试API和WebSocket连接
+5. 使用床控按钮测试API命令
+
+如果前端测试正常工作但您的实际前端应用程序出现问题，则问题可能与以下相关：
+
+- CORS配置
+- API端点格式不匹配
+- WebSocket连接参数
+- 前端和树莓派之间的网络连接
+
+检查浏览器开发者控制台中的详细错误消息，这些消息可以帮助确定具体问题。

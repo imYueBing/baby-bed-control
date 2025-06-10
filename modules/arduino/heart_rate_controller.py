@@ -37,9 +37,12 @@ class HeartRateController(BaseArduinoController):
     
     def _handle_specific_response(self, response_line):
         """处理来自Arduino的特定于心率的响应"""
+        logger.debug(f"处理心率响应: '{response_line}'")
+        
+        # 尝试多种可能的响应格式
         if response_line.startswith("HEART_RATE_DATA:"):
             try:
-                rate_str = response_line.split(":")[1]
+                rate_str = response_line.split(":")[1].strip()
                 self.current_heart_rate = int(rate_str)
                 self.last_heart_rate_response = response_line
                 self.consecutive_failures = 0 # Reset failures on successful response
@@ -48,13 +51,65 @@ class HeartRateController(BaseArduinoController):
             except (IndexError, ValueError) as e:
                 logger.warning(f"解析心率数据失败 '{response_line}': {e}")
                 self.consecutive_failures += 1
+        # 检查其他可能的响应格式 (例如 [BPM] 格式)
+        elif response_line.startswith("[BPM]"):
+            try:
+                rate_str = response_line.replace("[BPM]", "").strip()
+                self.current_heart_rate = int(rate_str)
+                self.last_heart_rate_response = response_line
+                self.consecutive_failures = 0
+                logger.info(f"检测到[BPM]格式心率: {self.current_heart_rate} BPM")
+                self._notify_subscribers(self.current_heart_rate)
+            except (ValueError) as e:
+                logger.warning(f"解析[BPM]格式心率数据失败 '{response_line}': {e}")
+                self.consecutive_failures += 1
+        # 新增: 检查 [HEART] 格式
+        elif response_line.startswith("[HEART]"):
+            try:
+                rate_str = response_line.replace("[HEART]", "").strip()
+                self.current_heart_rate = int(rate_str)
+                self.last_heart_rate_response = response_line
+                self.consecutive_failures = 0
+                logger.info(f"检测到[HEART]格式心率: {self.current_heart_rate} BPM")
+                self._notify_subscribers(self.current_heart_rate)
+            except (ValueError) as e:
+                logger.warning(f"解析[HEART]格式心率数据失败 '{response_line}': {e}")
+                self.consecutive_failures += 1
         elif response_line.startswith("UNKNOWN_CMD:"):
             logger.warning(f"HeartRateController 收到未知命令回复: {response_line}")
-            self.consecutive_failures += 1 # Count as failure if Arduino doesn't understand GetHeartRate
+            self.consecutive_failures += 1
         else:
-            # If it's some other response not recognized, also count as a failure for heart rate check
+            # 如果是其他响应，尝试在响应中寻找心率数据
             logger.debug(f"HeartRateController收到非预期响应: {response_line}")
-            self.consecutive_failures += 1 
+            
+            # 尝试查找心率数据模式 - 例如"HEART_RATE=XX"或"HEART=XX"
+            if "HEART_RATE=" in response_line:
+                try:
+                    parts = response_line.split("HEART_RATE=")
+                    rate_str = parts[1].split(",")[0].strip() if "," in parts[1] else parts[1].strip()
+                    self.current_heart_rate = int(rate_str)
+                    self.last_heart_rate_response = response_line
+                    self.consecutive_failures = 0
+                    logger.info(f"从状态响应中提取心率: {self.current_heart_rate} BPM")
+                    self._notify_subscribers(self.current_heart_rate)
+                    return
+                except (IndexError, ValueError) as e:
+                    logger.warning(f"从状态响应中提取心率失败 '{response_line}': {e}")
+            # 新增: 检查 HEART= 格式 (用于STATUS响应)
+            elif "HEART=" in response_line:
+                try:
+                    parts = response_line.split("HEART=")
+                    rate_str = parts[1].split(",")[0].strip() if "," in parts[1] else parts[1].strip()
+                    self.current_heart_rate = int(rate_str)
+                    self.last_heart_rate_response = response_line
+                    self.consecutive_failures = 0
+                    logger.info(f"从状态响应中提取心率: {self.current_heart_rate} BPM")
+                    self._notify_subscribers(self.current_heart_rate)
+                    return
+                except (IndexError, ValueError) as e:
+                    logger.warning(f"从状态响应中提取心率失败 '{response_line}': {e}")
+            
+            self.consecutive_failures += 1
     
     def _notify_subscribers(self, heart_rate):
         """
@@ -71,12 +126,20 @@ class HeartRateController(BaseArduinoController):
     
     def get_heart_rate(self):
         """获取当前心率 (将通过后台线程更新)"""
-        # For this simple test, actual request might be initiated by the monitor thread
-        # or an explicit call like this could also send a one-off request.
-        # Let's make it request directly for now for simplicity if not monitoring.
-        if not self._monitoring_thread or not self._monitoring_thread.is_alive():
-             logger.debug("非监控模式下请求一次性心率...")
-             self.send_command("GET_HEART_RATE")
+        # 添加详细日志
+        logger.info("正在请求心率数据...")
+        
+        # 发送命令并确保发送成功
+        success = self.send_command("GET_HEART_RATE")
+        if success:
+            logger.info("GET_HEART_RATE命令已发送，等待响应...")
+            # 等待一小段时间以接收响应
+            time.sleep(0.5)
+        else:
+            logger.error("发送GET_HEART_RATE命令失败")
+        
+        # 记录返回的心率值，方便调试
+        logger.info(f"当前心率值: {self.current_heart_rate}")
         return self.current_heart_rate
     
     def subscribe_heart_rate(self, callback):
