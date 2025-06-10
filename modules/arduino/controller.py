@@ -51,7 +51,7 @@ class ArduinoController:
     
     def bed_up(self):
         """
-        升高床
+        整体升高床
         
         Returns:
             bool: 命令是否已发送
@@ -60,7 +60,7 @@ class ArduinoController:
     
     def bed_down(self):
         """
-        降低床
+        整体降低床
         
         Returns:
             bool: 命令是否已发送
@@ -69,21 +69,84 @@ class ArduinoController:
     
     def bed_stop(self):
         """
-        停止床体移动
+        整体停止床体移动
         
         Returns:
             bool: 命令是否已发送
         """
         return self.bed_controller.bed_stop()
     
-    def get_bed_height(self):
+    def left_up(self):
         """
-        获取床体当前高度
+        左侧升高床
         
         Returns:
-            int or None: 床体当前高度，如果未知则为None
+            bool: 命令是否已发送
         """
-        return self.bed_controller.get_bed_height()
+        return self.bed_controller.left_up()
+    
+    def left_down(self):
+        """
+        左侧降低床
+        
+        Returns:
+            bool: 命令是否已发送
+        """
+        return self.bed_controller.left_down()
+    
+    def left_stop(self):
+        """
+        左侧停止床体移动
+        
+        Returns:
+            bool: 命令是否已发送
+        """
+        return self.bed_controller.left_stop()
+    
+    def right_up(self):
+        """
+        右侧升高床
+        
+        Returns:
+            bool: 命令是否已发送
+        """
+        return self.bed_controller.right_up()
+    
+    def right_down(self):
+        """
+        右侧降低床
+        
+        Returns:
+            bool: 命令是否已发送
+        """
+        return self.bed_controller.right_down()
+    
+    def right_stop(self):
+        """
+        右侧停止床体移动
+        
+        Returns:
+            bool: 命令是否已发送
+        """
+        return self.bed_controller.right_stop()
+    
+    def get_bed_status(self):
+        """
+        获取床体当前状态
+        
+        Returns:
+            dict: 床体状态信息
+        """
+        return self.bed_controller.get_bed_status()
+    
+    def get_bed_height(self):
+        """
+        获取床体当前高度 (为兼容旧API保留)
+        
+        Returns:
+            dict: 床体状态信息
+        """
+        return self.get_bed_status()
     
     # --------- 心率监测相关方法 ---------
     
