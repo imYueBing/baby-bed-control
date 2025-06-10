@@ -19,6 +19,7 @@ from .endpoints.bed import bed_api, init_bed_api
 from .endpoints.heart_rate import heart_rate_api, init_heart_rate_api
 from .endpoints.video import video_api, init_video_api
 from .endpoints.system import system_api, init_system_api
+from .endpoints.face_tracker import face_tracker_bp  # 导入自动人脸跟踪API端点
 
 # 导入WebSocket事件处理
 from .websocket.bed import register_bed_socketio_events
@@ -84,6 +85,9 @@ class APIServer:
         
         # 注册系统信息API
         self.app.register_blueprint(init_system_api(self.arduino_controller, self.camera_manager))
+        
+        # 注册自动人脸跟踪API
+        self.app.register_blueprint(face_tracker_bp)
     
     def _setup_socketio_events(self):
         """配置WebSocket事件"""
@@ -112,6 +116,9 @@ class APIServer:
             # 可选：在这里可以为床体和心率注册一些模拟的/提示性的WebSocket事件
             # 例如，当客户端请求时，返回 "Arduino not connected"
             self._setup_mock_arduino_socketio_events()
+        
+        # 注册自动人脸跟踪相关的WebSocket事件
+        self._setup_face_tracker_socketio_events()
     
     def _setup_mock_arduino_socketio_events(self):
         """配置当Arduino不可用时的模拟WebSocket事件处理"""
@@ -130,7 +137,90 @@ class APIServer:
                 'message': 'Arduino not connected',
                 'heart_rate': None
             })
+    
+    def _setup_face_tracker_socketio_events(self):
+        """配置自动人脸跟踪相关的WebSocket事件"""
+        @self.socketio.on('request_face_tracker_status')
+        def handle_face_tracker_status():
+            """处理请求自动人脸跟踪状态"""
+            face_tracker = self.app.face_tracker if hasattr(self.app, 'face_tracker') else None
+            
+            if not face_tracker:
+                self.socketio.emit('face_tracker_status_update', {
+                    'status': 'error',
+                    'message': 'Face tracker not initialized',
+                    'is_running': False
+                })
+                return
+            
+            self.socketio.emit('face_tracker_status_update', {
+                'status': 'success',
+                'is_running': face_tracker.is_running,
+                'scan_interval': face_tracker.scan_interval,
+                'movement_delay': face_tracker.movement_delay,
+                'face_detection_threshold': face_tracker.face_detection_threshold,
+                'no_face_count': face_tracker.no_face_count,
+                'last_face_detected': face_tracker.last_face_detected
+            })
         
+        @self.socketio.on('start_face_tracker')
+        def handle_start_face_tracker(data=None):
+            """处理启动自动人脸跟踪请求"""
+            face_tracker = self.app.face_tracker if hasattr(self.app, 'face_tracker') else None
+            
+            if not face_tracker:
+                self.socketio.emit('face_tracker_response', {
+                    'status': 'error',
+                    'message': 'Face tracker not initialized'
+                })
+                return
+            
+            # 更新配置（如果提供）
+            if data:
+                if 'scan_interval' in data:
+                    face_tracker.scan_interval = float(data['scan_interval'])
+                if 'movement_delay' in data:
+                    face_tracker.movement_delay = float(data['movement_delay'])
+                if 'face_detection_threshold' in data:
+                    face_tracker.face_detection_threshold = int(data['face_detection_threshold'])
+            
+            # 启动跟踪器
+            success = face_tracker.start()
+            
+            if success:
+                self.socketio.emit('face_tracker_response', {
+                    'status': 'success',
+                    'message': 'Face tracker started',
+                    'is_running': True
+                })
+            else:
+                self.socketio.emit('face_tracker_response', {
+                    'status': 'error',
+                    'message': 'Failed to start face tracker',
+                    'is_running': False
+                })
+        
+        @self.socketio.on('stop_face_tracker')
+        def handle_stop_face_tracker():
+            """处理停止自动人脸跟踪请求"""
+            face_tracker = self.app.face_tracker if hasattr(self.app, 'face_tracker') else None
+            
+            if not face_tracker:
+                self.socketio.emit('face_tracker_response', {
+                    'status': 'error',
+                    'message': 'Face tracker not initialized'
+                })
+                return
+            
+            # 停止跟踪器
+            face_tracker.stop()
+            
+            self.socketio.emit('face_tracker_response', {
+                'status': 'success',
+                'message': 'Face tracker stopped',
+                'is_running': False
+            })
+    
     def start(self):
         """启动服务器"""
         if self.is_running:

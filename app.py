@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 # 导入模块
 from modules.arduino.controller import ArduinoController
 from modules.camera.camera_manager import CameraManager
+from modules.auto_face_tracker import AutoFaceTracker  # 导入自动人脸跟踪模块
 from api.server import APIServer
 from config.settings import get_config
 
@@ -48,6 +49,8 @@ def parse_args():
                         help='启用AI人脸识别功能 (覆盖config.json的设置)')
     parser.add_argument('--disable-face-detection', action='store_true',
                         help='禁用AI人脸识别功能 (覆盖config.json的设置)')
+    parser.add_argument('--enable-face-tracker', action='store_true',
+                        help='启用自动人脸跟踪功能')
     return parser.parse_args()
 
 def setup(args):
@@ -59,6 +62,7 @@ def setup(args):
     arduino_controller = None
     camera_manager = None
     api_server = None
+    face_tracker = None
 
     # 初始化 Arduino 控制器（如果未指定--no-arduino）
     if not args.no_arduino:
@@ -96,6 +100,25 @@ def setup(args):
     except Exception as e:
         logger.warning(f"摄像头初始化失败: {e}")
 
+    # 初始化自动人脸跟踪器（如果启用）
+    if args.enable_face_tracker and camera_manager and arduino_controller:
+        try:
+            face_tracker = AutoFaceTracker(
+                camera_manager=camera_manager,
+                arduino_controller=arduino_controller,
+                scan_interval=config.get('face_tracker', 'scan_interval', 3.0),
+                movement_delay=config.get('face_tracker', 'movement_delay', 2.0),
+                face_detection_threshold=config.get('face_tracker', 'face_detection_threshold', 3)
+            )
+            logger.info("自动人脸跟踪器初始化成功")
+        except Exception as e:
+            logger.warning(f"自动人脸跟踪器初始化失败: {e}")
+    elif args.enable_face_tracker:
+        if not camera_manager:
+            logger.warning("无法初始化自动人脸跟踪器：摄像头未初始化")
+        if not arduino_controller:
+            logger.warning("无法初始化自动人脸跟踪器：Arduino控制器未初始化")
+
     # 初始化 API 服务器 - 这里应该只创建 APIServer 实例
     api_server_instance = APIServer(
         arduino_controller=arduino_controller,
@@ -105,11 +128,18 @@ def setup(args):
     )
     logger.info("API 服务器对象创建成功")
 
-    return arduino_controller, camera_manager, api_server_instance
+    # 将自动人脸跟踪器添加到API服务器的应用上下文中
+    api_server_instance.app.face_tracker = face_tracker
 
-def cleanup(arduino_controller, camera_manager, api_server):
+    return arduino_controller, camera_manager, api_server_instance, face_tracker
+
+def cleanup(arduino_controller, camera_manager, api_server, face_tracker=None):
     """清理资源"""
     logger.info("系统正在关闭...")
+    
+    # 停止自动人脸跟踪
+    if face_tracker:
+        face_tracker.stop()
     
     # 关闭Arduino连接
     if arduino_controller:
@@ -157,7 +187,7 @@ def main():
                 return
 
         components = setup(args)
-        arduino_controller, camera_manager, api_server_instance = components
+        arduino_controller, camera_manager, api_server_instance, face_tracker = components
         
         signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, components))
         signal.signal(signal.SIGTERM, lambda sig, frame: signal_handler(sig, frame, components))
@@ -174,6 +204,11 @@ def main():
             print(f"摄像头调试窗口已启动: {args.debug_window_name}")
             print("按ESC键可关闭调试窗口")
         
+        # 如果启用了自动人脸跟踪，启动它
+        if args.enable_face_tracker and face_tracker:
+            face_tracker.start()
+            print("自动人脸跟踪已启动")
+        
         print("系统已启动" + ("（仅相机模式）" if args.no_arduino else ""))
         print("按Ctrl+C退出")
         while True:
@@ -181,7 +216,7 @@ def main():
             
     except Exception as e:
         logger.error(f"系统启动失败: {e}")
-        if 'components' in locals() and components[2]:
+        if 'components' in locals() and len(components) >= 3:
             cleanup(*components)
         elif 'components' in locals():
             if components[0]: components[0].close()
