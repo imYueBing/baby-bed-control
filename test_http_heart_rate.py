@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-HTTP心率API测试脚本 - 专门测试心率相关的HTTP API
+HTTP Heart Rate API Test Script - Specifically tests heart rate related HTTP API
 """
 
 import requests
@@ -12,38 +12,38 @@ import argparse
 import time
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='HTTP心率API测试')
+    parser = argparse.ArgumentParser(description='HTTP Heart Rate API Test')
     parser.add_argument('--host', type=str, default='localhost', 
-                        help='API服务器主机名或IP地址')
+                        help='API server hostname or IP address')
     parser.add_argument('--port', type=int, default=5000, 
-                        help='API服务器端口')
+                        help='API server port')
     parser.add_argument('--iterations', type=int, default=10,
-                        help='测试迭代次数')
+                        help='Number of test iterations')
     parser.add_argument('--interval', type=float, default=1.0,
-                        help='测试间隔（秒）')
+                        help='Test interval (seconds)')
     parser.add_argument('--debug', action='store_true',
-                        help='启用调试输出')
+                        help='Enable debug output')
     return parser.parse_args()
 
 def test_http_heart_rate_api(base_url, iterations=10, interval=1.0, debug=False):
-    """测试心率HTTP API端点"""
-    print(f"\n===== 测试心率HTTP API ({base_url}/api/heart-rate) =====")
+    """Test heart rate HTTP API endpoint"""
+    print(f"\n===== Testing Heart Rate HTTP API ({base_url}/api/heart-rate) =====")
     
     success_count = 0
     failure_count = 0
     heart_rates = []
     
     for i in range(iterations):
-        print(f"\n迭代 {i+1}/{iterations}:")
+        print(f"\nIteration {i+1}/{iterations}:")
         
         try:
             if debug:
-                print(f"  请求: GET {base_url}/api/heart-rate")
+                print(f"  Request: GET {base_url}/api/heart-rate")
                 
             response = requests.get(f"{base_url}/api/heart-rate", timeout=5)
             
             if debug:
-                print(f"  状态码: {response.status_code}")
+                print(f"  Status code: {response.status_code}")
             
             if response.status_code == 200:
                 try:
@@ -51,34 +51,34 @@ def test_http_heart_rate_api(base_url, iterations=10, interval=1.0, debug=False)
                     heart_rate = response_json.get('heart_rate')
                     status = response_json.get('status')
                     
-                    print(f"  心率: {heart_rate}, 状态: {status}")
+                    print(f"  Heart rate: {heart_rate}, Status: {status}")
                     
                     if status == 'ok' and heart_rate is not None:
                         success_count += 1
                         heart_rates.append(heart_rate)
                     else:
                         failure_count += 1
-                        print(f"  错误响应: {json.dumps(response_json, ensure_ascii=False)}")
+                        print(f"  Error response: {json.dumps(response_json, ensure_ascii=False)}")
                         
                 except json.JSONDecodeError:
-                    print(f"  响应不是有效的JSON: {response.text}")
+                    print(f"  Response is not valid JSON: {response.text}")
                     failure_count += 1
             else:
-                print(f"  错误响应: {response.text}")
+                print(f"  Error response: {response.text}")
                 failure_count += 1
                 
         except requests.exceptions.RequestException as e:
-            print(f"  请求错误: {e}")
+            print(f"  Request error: {e}")
             failure_count += 1
             
-        # 在下一次迭代之前等待
+        # Wait before next iteration
         if i < iterations - 1:
             time.sleep(interval)
     
-    print(f"\n总结: 成功 {success_count}, 失败 {failure_count}")
+    print(f"\nSummary: Success {success_count}, Failure {failure_count}")
     if heart_rates:
-        print(f"获取到的心率值: {heart_rates}")
-        print(f"平均心率: {sum(heart_rates)/len(heart_rates):.1f}")
+        print(f"Retrieved heart rates: {heart_rates}")
+        print(f"Average heart rate: {sum(heart_rates)/len(heart_rates):.1f}")
     
     return success_count, failure_count
 
@@ -86,14 +86,14 @@ def main():
     args = parse_args()
     base_url = f"http://{args.host}:{args.port}"
     
-    # 打印基本信息
-    print(f"=== HTTP心率API测试 ===")
+    # Print basic information
+    print(f"=== HTTP Heart Rate API Test ===")
     print(f"API URL: {base_url}/api/heart-rate")
-    print(f"测试次数: {args.iterations}")
-    print(f"测试间隔: {args.interval}秒")
+    print(f"Test count: {args.iterations}")
+    print(f"Test interval: {args.interval} seconds")
     print("=" * 30)
     
-    # 测试HTTP API
+    # Test HTTP API
     success_count, failure_count = test_http_heart_rate_api(
         base_url, 
         iterations=args.iterations, 
@@ -101,13 +101,13 @@ def main():
         debug=args.debug
     )
     
-    # 判断测试是否成功
+    # Determine if test was successful
     if failure_count == 0 and success_count > 0:
-        print("\n心率API测试通过!")
+        print("\nHeart rate API test passed!")
         return 0
     else:
-        print("\n心率API测试存在问题!")
-        print(f"  - 成功: {success_count}, 失败: {failure_count}")
+        print("\nHeart rate API test has issues!")
+        print(f"  - Success: {success_count}, Failure: {failure_count}")
         return 1
 
 if __name__ == "__main__":

@@ -1,2 +1,2 @@
-# 摄像头模块初始化文件 
+# Camera module initialization file
 from .camera_manager import CameraManager 

@@ -2,37 +2,37 @@
 # -*- coding: utf-8 -*-
 
 """
-自动人脸跟踪API端点
+Auto Face Tracking API Endpoint
 """
 
 from flask import Blueprint, jsonify, request, current_app
 import logging
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 
-# 创建蓝图
+# Create blueprint
 face_tracker_bp = Blueprint('face_tracker', __name__)
 
 @face_tracker_bp.route('/api/face_tracker/start', methods=['POST'])
 def start_face_tracker():
-    """启动自动人脸跟踪"""
+    """Start auto face tracking"""
     try:
-        # 获取应用上下文中的自动人脸跟踪器
+        # Get auto face tracker from application context
         face_tracker = current_app.face_tracker
         if not face_tracker:
             return jsonify({
                 'success': False,
-                'message': '自动人脸跟踪器未初始化'
+                'message': 'Auto face tracker not initialized'
             }), 500
         
-        # 从请求中获取参数（如果有）
+        # Get parameters from request (if any)
         data = request.get_json() or {}
         scan_interval = data.get('scan_interval', None)
         movement_delay = data.get('movement_delay', None)
         face_detection_threshold = data.get('face_detection_threshold', None)
         
-        # 如果提供了参数，更新跟踪器的配置
+        # If parameters were provided, update tracker configuration
         if scan_interval is not None:
             face_tracker.scan_interval = float(scan_interval)
         if movement_delay is not None:
@@ -40,13 +40,13 @@ def start_face_tracker():
         if face_detection_threshold is not None:
             face_tracker.face_detection_threshold = int(face_detection_threshold)
         
-        # 启动自动人脸跟踪
+        # Start auto face tracking
         success = face_tracker.start()
         
         if success:
             return jsonify({
                 'success': True,
-                'message': '自动人脸跟踪已启动',
+                'message': 'Auto face tracking started',
                 'config': {
                     'scan_interval': face_tracker.scan_interval,
                     'movement_delay': face_tracker.movement_delay,
@@ -56,53 +56,53 @@ def start_face_tracker():
         else:
             return jsonify({
                 'success': False,
-                'message': '启动自动人脸跟踪失败'
+                'message': 'Failed to start auto face tracking'
             }), 500
             
     except Exception as e:
-        logger.error(f"启动自动人脸跟踪出错: {e}")
+        logger.error(f"Error starting auto face tracking: {e}")
         return jsonify({
             'success': False,
-            'message': f'启动自动人脸跟踪时发生错误: {str(e)}'
+            'message': f'Error occurred while starting auto face tracking: {str(e)}'
         }), 500
 
 @face_tracker_bp.route('/api/face_tracker/stop', methods=['POST'])
 def stop_face_tracker():
-    """停止自动人脸跟踪"""
+    """Stop auto face tracking"""
     try:
-        # 获取应用上下文中的自动人脸跟踪器
+        # Get auto face tracker from application context
         face_tracker = current_app.face_tracker
         if not face_tracker:
             return jsonify({
                 'success': False,
-                'message': '自动人脸跟踪器未初始化'
+                'message': 'Auto face tracker not initialized'
             }), 500
         
-        # 停止自动人脸跟踪
+        # Stop auto face tracking
         face_tracker.stop()
         
         return jsonify({
             'success': True,
-            'message': '自动人脸跟踪已停止'
+            'message': 'Auto face tracking stopped'
         })
             
     except Exception as e:
-        logger.error(f"停止自动人脸跟踪出错: {e}")
+        logger.error(f"Error stopping auto face tracking: {e}")
         return jsonify({
             'success': False,
-            'message': f'停止自动人脸跟踪时发生错误: {str(e)}'
+            'message': f'Error occurred while stopping auto face tracking: {str(e)}'
         }), 500
 
 @face_tracker_bp.route('/api/face_tracker/status', methods=['GET'])
 def get_face_tracker_status():
-    """获取自动人脸跟踪状态"""
+    """Get auto face tracking status"""
     try:
-        # 获取应用上下文中的自动人脸跟踪器
+        # Get auto face tracker from application context
         face_tracker = current_app.face_tracker
         if not face_tracker:
             return jsonify({
                 'success': False,
-                'message': '自动人脸跟踪器未初始化'
+                'message': 'Auto face tracker not initialized'
             }), 500
         
         return jsonify({
@@ -119,33 +119,33 @@ def get_face_tracker_status():
         })
             
     except Exception as e:
-        logger.error(f"获取自动人脸跟踪状态出错: {e}")
+        logger.error(f"Error getting auto face tracking status: {e}")
         return jsonify({
             'success': False,
-            'message': f'获取自动人脸跟踪状态时发生错误: {str(e)}'
+            'message': f'Error occurred while getting auto face tracking status: {str(e)}'
         }), 500
 
 @face_tracker_bp.route('/api/face_tracker/config', methods=['POST'])
 def update_face_tracker_config():
-    """更新自动人脸跟踪配置"""
+    """Update auto face tracking configuration"""
     try:
-        # 获取应用上下文中的自动人脸跟踪器
+        # Get auto face tracker from application context
         face_tracker = current_app.face_tracker
         if not face_tracker:
             return jsonify({
                 'success': False,
-                'message': '自动人脸跟踪器未初始化'
+                'message': 'Auto face tracker not initialized'
             }), 500
         
-        # 从请求中获取参数
+        # Get parameters from request
         data = request.get_json()
         if not data:
             return jsonify({
                 'success': False,
-                'message': '未提供配置参数'
+                'message': 'No configuration parameters provided'
             }), 400
         
-        # 更新配置
+        # Update configuration
         if 'scan_interval' in data:
             face_tracker.scan_interval = float(data['scan_interval'])
         
@@ -161,7 +161,7 @@ def update_face_tracker_config():
         
         return jsonify({
             'success': True,
-            'message': '自动人脸跟踪配置已更新',
+            'message': 'Auto face tracking configuration updated',
             'config': {
                 'scan_interval': face_tracker.scan_interval,
                 'movement_delay': face_tracker.movement_delay,
@@ -171,8 +171,8 @@ def update_face_tracker_config():
         })
             
     except Exception as e:
-        logger.error(f"更新自动人脸跟踪配置出错: {e}")
+        logger.error(f"Error updating auto face tracking configuration: {e}")
         return jsonify({
             'success': False,
-            'message': f'更新自动人脸跟踪配置时发生错误: {str(e)}'
+            'message': f'Error occurred while updating auto face tracking configuration: {str(e)}'
         }), 500 

@@ -2,57 +2,57 @@
 # -*- coding: utf-8 -*-
 
 """
-床体控制WebSocket事件处理模块
+Bed Control WebSocket Event Handling Module
 """
 
 import logging
 from flask_socketio import emit
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 
 def register_bed_socketio_events(socketio, arduino_controller):
     """
-    注册床体控制相关的WebSocket事件处理程序
+    Register bed control related WebSocket event handlers
     
     Args:
-        socketio: SocketIO实例
-        arduino_controller: Arduino控制器实例
+        socketio: SocketIO instance
+        arduino_controller: Arduino controller instance
     """
     
     @socketio.on('bed_control')
     def handle_bed_control(data):
-        """处理床控制事件"""
+        """Handle bed control events"""
         action = data.get('action')
         
         if action == 'up':
             success = arduino_controller.bed_up()
-            logger.info(f"WebSocket床体上升命令: {'成功' if success else '失败'}")
+            logger.info(f"WebSocket bed up command: {'successful' if success else 'failed'}")
         elif action == 'down':
             success = arduino_controller.bed_down()
-            logger.info(f"WebSocket床体下降命令: {'成功' if success else '失败'}")
+            logger.info(f"WebSocket bed down command: {'successful' if success else 'failed'}")
         elif action == 'stop':
             success = arduino_controller.bed_stop()
-            logger.info(f"WebSocket床体停止命令: {'成功' if success else '失败'}")
+            logger.info(f"WebSocket bed stop command: {'successful' if success else 'failed'}")
         else:
-            emit('error', {'message': '无效的床控制操作'})
+            emit('error', {'message': 'Invalid bed control operation'})
             return
         
         emit('bed_control_response', {
             'status': 'ok' if success else 'error',
             'action': action,
-            'message': f'床体{action}操作' + ('成功' if success else '失败')
+            'message': f'Bed {action} operation ' + ('successful' if success else 'failed')
         })
         
-        # 发送更新后的状态
+        # Send updated status
         emit_bed_status_update(arduino_controller)
 
 def emit_bed_status_update(arduino_controller):
     """
-    发送床体状态更新
+    Send bed status update
     
     Args:
-        arduino_controller: Arduino控制器实例
+        arduino_controller: Arduino controller instance
     """
     bed_height = arduino_controller.get_bed_height()
     

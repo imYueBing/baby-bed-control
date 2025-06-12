@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-摄像头管理模块 - 负责视频捕获和流处理
+Camera Management Module - Responsible for video capture and stream processing
 """
 
 import cv2
@@ -16,27 +16,27 @@ import os
 import tflite_runtime.interpreter as tflite
 # END AI FACE DETECTION IMPORTS
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 
 class CameraManager:
-    """摄像头管理类，负责视频捕获和处理"""
+    """Camera management class, responsible for video capture and processing"""
     
     def __init__(self, resolution=(640, 480), framerate=30, use_picamera=True, 
-                 enable_ai_face_detection=False, # AI 功能开关
+                 enable_ai_face_detection=False, # AI feature switch
                  cascade_path="/home/jeong/opencv_cascades/haarcascade_frontalface_default.xml", # TODO: Make this configurable
                  tflite_model_path="/home/jeong/frontal_face_classifier.tflite" # TODO: Make this configurable
                 ):
         """
-        初始化摄像头管理器
+        Initialize camera manager
         
         Args:
-            resolution (tuple): 分辨率 (宽, 高)
-            framerate (int): 帧率
-            use_picamera (bool): 是否使用树莓派摄像头
-            enable_ai_face_detection (bool): 是否启用AI人脸检测
-            cascade_path (str): Haar cascade模型的路径
-            tflite_model_path (str): TFLite模型的路径
+            resolution (tuple): Resolution (width, height)
+            framerate (int): Frame rate
+            use_picamera (bool): Whether to use Raspberry Pi camera
+            enable_ai_face_detection (bool): Whether to enable AI face detection
+            cascade_path (str): Path to Haar cascade model
+            tflite_model_path (str): Path to TFLite model
         """
         self.resolution = resolution
         self.framerate = framerate
@@ -63,14 +63,14 @@ class CameraManager:
         if self.enable_ai_face_detection:
             self._initialize_ai_models(cascade_path, tflite_model_path)
         
-        # 初始化摄像头
+        # Initialize camera
         self._init_camera()
     
     def _init_camera(self):
-        """初始化摄像头"""
+        """Initialize camera"""
         try:
             logger.debug(f"Attempting to initialize camera with resolution: {self.resolution} (type: {type(self.resolution)}) and framerate: {self.framerate}")
-            # 尝试使用PiCamera库（如果可用且启用）
+            # Try to use PiCamera library (if available and enabled)
             if self.use_picamera:
                 try:
                     from picamera2 import Picamera2
@@ -81,12 +81,12 @@ class CameraManager:
                     )
                     self.camera.configure(config)
                     self.camera.start()
-                    logger.info("已初始化树莓派摄像头")
+                    logger.info("Raspberry Pi camera initialized")
                 except (ImportError, ModuleNotFoundError):
-                    logger.warning("无法导入picamera2模块，回退到OpenCV")
+                    logger.warning("Could not import picamera2 module, falling back to OpenCV")
                     self.use_picamera = False
             
-            # 如果不使用PiCamera或者导入失败，使用OpenCV
+            # If not using PiCamera or import failed, use OpenCV
             if not self.use_picamera:
                 self.camera = cv2.VideoCapture(0)
                 # Add checks before accessing resolution elements
@@ -100,25 +100,25 @@ class CameraManager:
                 self.camera.set(cv2.CAP_PROP_FPS, self.framerate)
                 
                 if not self.camera.isOpened():
-                    raise RuntimeError("无法打开摄像头")
+                    raise RuntimeError("Could not open camera")
                 
-                logger.info("已初始化OpenCV摄像头")
+                logger.info("OpenCV camera initialized")
             
-            # 启动捕获线程
+            # Start capture thread
             self.is_running = True
             self.capture_thread = threading.Thread(target=self._capture_loop)
             self.capture_thread.daemon = True
             self.capture_thread.start()
             
         except Exception as e:
-            logger.error(f"初始化摄像头失败: {e}", exc_info=True) # exc_info=True will print traceback
+            logger.error(f"Failed to initialize camera: {e}", exc_info=True) # exc_info=True will print traceback
             self.camera = None
             self.is_running = False # Ensure is_running is set to False on failure
     
     def _initialize_ai_models(self, cascade_path, tflite_model_path):
-        """初始化AI人脸识别模型"""
+        """Initialize AI face recognition models"""
         logger.info("Initializing AI face detection models...")
-        # 1. Haar cascade 경로 설정 및 로딩
+        # 1. Haar cascade path setup and loading
         # TODO: These paths should be made configurable (e.g., via settings file or env vars)
         # For now, using the provided paths.
         if not os.path.exists(cascade_path):
@@ -133,7 +133,7 @@ class CameraManager:
             self.enable_ai_face_detection = False
             return
 
-        # 2. TFLite 모델 로딩
+        # 2. TFLite model loading
         if not os.path.exists(tflite_model_path):
             logger.error(f"TFLite model file not found: {tflite_model_path}")
             self.enable_ai_face_detection = False # Disable AI if model is missing
@@ -151,7 +151,7 @@ class CameraManager:
         logger.info("AI face detection models initialized successfully.")
 
     def _apply_ai_face_detection(self, frame_to_process):
-        """在给定帧上应用AI人脸检测和分类"""
+        """Apply AI face detection and classification on the given frame"""
         if not self.enable_ai_face_detection or self.face_cascade is None or self.tflite_interpreter is None:
             return frame_to_process
 
@@ -197,25 +197,25 @@ class CameraManager:
         return frame_to_process
     
     def _capture_loop(self):
-        """捕获视频帧的循环"""
+        """Loop for capturing video frames"""
         while self.is_running and self.camera:
             try:
-                # 获取帧
+                # Get frame
                 if self.use_picamera:
-                    # 使用PiCamera API
+                    # Use PiCamera API
                     frame = self.camera.capture_array()
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                     success = True
                 else:
-                    # 使用OpenCV
+                    # Use OpenCV
                     success, frame = self.camera.read()
                 
                 if success and frame is not None: # Added frame is not None check
-                    # 应用AI人脸识别 (如果启用)
+                    # Apply AI face recognition (if enabled)
                     if self.enable_ai_face_detection:
                         frame = self._apply_ai_face_detection(frame)
 
-                    # 在帧上添加时间戳
+                    # Add timestamp to frame
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     cv2.putText(
                         frame, 
@@ -228,41 +228,41 @@ class CameraManager:
                         cv2.LINE_AA
                     )
                     
-                    # 更新当前帧
+                    # Update current frame
                     with self.frame_lock:
                         self.current_frame = frame.copy()
                     
-                    # 设置帧可用事件
+                    # Set frame available event
                     self.frame_available.set()
                     
-                    # 通知所有客户端
+                    # Notify all clients
                     self._notify_clients()
                 
-                # 等待适当的时间以保持帧率
+                # Wait appropriate time to maintain frame rate
                 time.sleep(1.0 / self.framerate)
                 
             except Exception as e:
-                logger.error(f"捕获视频帧时出错: {e}")
-                time.sleep(1)  # 错误后暂停
+                logger.error(f"Error capturing video frame: {e}")
+                time.sleep(1)  # Pause after error
     
     def _notify_clients(self):
-        """通知所有注册的客户端有新帧可用"""
+        """Notify all registered clients that a new frame is available"""
         with self.clients_lock:
-            # 创建客户端列表的副本以避免在迭代过程中修改
+            # Create a copy of the client list to avoid modifying the list during iteration
             clients_copy = self.clients.copy()
         
         for callback in clients_copy:
             try:
                 callback(self.get_frame())
             except Exception as e:
-                logger.error(f"通知客户端时出错: {e}")
-                # 如果回调失败，移除该客户端
+                logger.error(f"Error notifying client: {e}")
+                # If callback fails, remove the client
                 with self.clients_lock:
                     if callback in self.clients:
                         self.clients.remove(callback)
     
     def close(self):
-        """关闭摄像头并清理资源"""
+        """Close camera and clean up resources"""
         self.is_running = False
         self.stop_recording()
         self.stop_debug_window()
@@ -278,17 +278,17 @@ class CameraManager:
                 self.camera.release()
             
             self.camera = None
-            logger.info("摄像头已关闭")
+            logger.info("Camera closed")
     
     def get_frame(self):
         """
-        获取当前视频帧
+        Get current video frame
         
         Returns:
-            numpy.ndarray: BGR格式的视频帧
+            numpy.ndarray: BGR formatted video frame
         """
         if not self.is_running or self.current_frame is None:
-            # 返回一个黑色图像
+            # Return a black image
             black_frame = np.zeros((480, 640, 3), dtype=np.uint8)
             cv2.putText(
                 black_frame, 
@@ -302,10 +302,10 @@ class CameraManager:
             )
             return black_frame
         
-        # 等待帧可用
+        # Wait for frame to be available
         self.frame_available.wait(timeout=1.0)
         
-        # 获取当前帧的副本
+        # Get a copy of the current frame
         with self.frame_lock:
             if self.current_frame is not None:
                 return self.current_frame.copy()
@@ -314,13 +314,13 @@ class CameraManager:
     
     def get_jpeg_frame(self, quality=90):
         """
-        获取JPEG编码的当前帧
+        Get JPEG encoded current frame
         
         Args:
-            quality (int): JPEG质量，范围0-100
+            quality (int): JPEG quality, range 0-100
             
         Returns:
-            bytes: JPEG编码的视频帧
+            bytes: JPEG encoded video frame
         """
         frame = self.get_frame()
         ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
@@ -330,10 +330,10 @@ class CameraManager:
     
     def register_client(self, callback):
         """
-        注册一个视频帧客户端
+        Register a video frame client
         
         Args:
-            callback (callable): 当新帧可用时调用的回调函数
+            callback (callable): Callback function to call when a new frame is available
         """
         with self.clients_lock:
             if callback not in self.clients:
@@ -341,10 +341,10 @@ class CameraManager:
     
     def unregister_client(self, callback):
         """
-        注销一个视频帧客户端
+        Unregister a video frame client
         
         Args:
-            callback (callable): 先前注册的回调函数
+            callback (callable): Previously registered callback function
         """
         with self.clients_lock:
             if callback in self.clients:
@@ -352,23 +352,23 @@ class CameraManager:
     
     def start_recording(self, output_path="videos"):
         """
-        开始录制视频
+        Start recording video
         
         Args:
-            output_path (str): 输出目录路径
+            output_path (str): Output directory path
         """
         if self.is_recording:
-            logger.warning("已经在录制视频")
+            logger.warning("Already recording video")
             return False
         
-        # 创建输出目录
+        # Create output directory
         os.makedirs(output_path, exist_ok=True)
         
-        # 创建输出文件名
+        # Create output filename
         filename = f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
         output_file = os.path.join(output_path, filename)
         
-        # 开始录制
+        # Start recording
         self.is_recording = True
         self.recording_thread = threading.Thread(
             target=self._recording_loop,
@@ -377,23 +377,23 @@ class CameraManager:
         self.recording_thread.daemon = True
         self.recording_thread.start()
         
-        logger.info(f"开始录制视频到 {output_file}")
+        logger.info(f"Starting to record video to {output_file}")
         return True
     
     def stop_recording(self):
-        """停止录制视频"""
+        """Stop recording video"""
         if not self.is_recording:
             return
         
         self.is_recording = False
         if self.recording_thread and self.recording_thread.is_alive():
             self.recording_thread.join(timeout=2)
-            logger.info("视频录制已停止")
+            logger.info("Video recording stopped")
     
     def _recording_loop(self, output_file):
-        """视频录制循环"""
+        """Video recording loop"""
         try:
-            # 设置视频编解码器
+            # Set video codec
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out = cv2.VideoWriter(
                 output_file, 
@@ -403,39 +403,39 @@ class CameraManager:
             )
             
             while self.is_recording and self.is_running:
-                # 获取当前帧并写入视频
+                # Get current frame and write to video
                 frame = self.get_frame()
                 if frame is not None:
                     out.write(frame)
                 
-                # 短暂睡眠以减少CPU使用
+                # Short sleep to reduce CPU usage
                 time.sleep(0.01)
                 
         except Exception as e:
-            logger.error(f"录制视频时出错: {e}")
+            logger.error(f"Error recording video: {e}")
         finally:
             if 'out' in locals():
                 out.release()
-                logger.info(f"录制的视频已保存到 {output_file}")
+                logger.info(f"Recorded video saved to {output_file}")
                 
-    def start_debug_window(self, window_name="摄像头调试"):
+    def start_debug_window(self, window_name="Camera Debug"):
         """
-        在树莓派上打开一个窗口，实时显示摄像头捕获的画面
+        Open a window on Raspberry Pi to display live camera capture
         
         Args:
-            window_name (str): 窗口标题
+            window_name (str): Window title
         
         Returns:
-            bool: 是否成功启动调试窗口
+            bool: Whether the debug window was successfully started
         """
         if self.debug_window_active:
-            logger.warning("调试窗口已经在运行")
+            logger.warning("Debug window already running")
             return False
             
         self.debug_window_active = True
         self.debug_window_name = window_name
         
-        # 创建并启动调试窗口线程
+        # Create and start debug window thread
         self.debug_thread = threading.Thread(
             target=self._debug_window_loop,
             args=(window_name,)
@@ -443,11 +443,11 @@ class CameraManager:
         self.debug_thread.daemon = True
         self.debug_thread.start()
         
-        logger.info(f"已启动摄像头调试窗口: {window_name}")
+        logger.info(f"Started camera debug window: {window_name}")
         return True
         
     def stop_debug_window(self):
-        """停止调试窗口"""
+        """Stop debug window"""
         if not self.debug_window_active:
             return
             
@@ -455,16 +455,16 @@ class CameraManager:
         if self.debug_thread and self.debug_thread.is_alive():
             self.debug_thread.join(timeout=2)
             cv2.destroyAllWindows()
-            logger.info("摄像头调试窗口已关闭")
+            logger.info("Camera debug window closed")
             
     def _debug_window_loop(self, window_name):
-        """调试窗口显示循环"""
+        """Debug window display loop"""
         try:
             cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
             
-            # 如果是运行在树莓派上，可以设置全屏
+            # If running on Raspberry Pi, can set full screen
             try:
-                # 检测是否在树莓派上运行
+                # Check if running on Raspberry Pi
                 with open('/proc/device-tree/model', 'r') as f:
                     if 'Raspberry Pi' in f.read():
                         cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -472,10 +472,10 @@ class CameraManager:
                 pass
                 
             while self.debug_window_active and self.is_running:
-                # 获取当前帧并在窗口中显示
+                # Get current frame and display in window
                 frame = self.get_frame()
                 if frame is not None:
-                    # 添加调试信息
+                    # Add debug information
                     debug_frame = frame.copy()
                     cv2.putText(
                         debug_frame,
@@ -488,7 +488,7 @@ class CameraManager:
                         cv2.LINE_AA
                     )
                     
-                    # 显示相机类型
+                    # Display camera type
                     camera_type = "PiCamera" if self.use_picamera else "OpenCV"
                     cv2.putText(
                         debug_frame,
@@ -501,20 +501,20 @@ class CameraManager:
                         cv2.LINE_AA
                     )
                     
-                    # 显示帧
+                    # Display frame
                     cv2.imshow(window_name, debug_frame)
                     
-                # 检查键盘输入，按ESC键退出
+                # Check keyboard input, press ESC key to exit
                 key = cv2.waitKey(1) & 0xFF
-                if key == 27:  # ESC键
+                if key == 27:  # ESC key
                     self.debug_window_active = False
                     break
                     
-                # 短暂睡眠以减少CPU使用
+                # Short sleep to reduce CPU usage
                 time.sleep(0.01)
                 
         except Exception as e:
-            logger.error(f"显示调试窗口时出错: {e}")
+            logger.error(f"Error displaying debug window: {e}")
         finally:
             cv2.destroyAllWindows()
-            logger.info("调试窗口已关闭") 
+            logger.info("Debug window closed") 

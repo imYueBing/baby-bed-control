@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-API测试脚本 - 测试模块化后的API结构
+API Test Script - Tests the modularized API structure
 """
 
 import logging
@@ -10,7 +10,7 @@ import sys
 from flask import Flask
 from flask_socketio import SocketIO
 
-# 设置日志
+# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 导入必要的模块
+# Import necessary modules
 from modules.arduino.controller import ArduinoController
 from api.endpoints.bed import init_bed_api
 from api.endpoints.heart_rate import init_heart_rate_api
@@ -29,35 +29,35 @@ from api.websocket.bed import register_bed_socketio_events
 from api.websocket.heart_rate import register_heart_rate_socketio_events
 
 def test_api():
-    """测试API初始化"""
+    """Test API initialization"""
     try:
-        # 创建测试用的Arduino控制器（使用模拟设备）
+        # Create test Arduino controller (using simulated device)
         arduino_controller = ArduinoController(port=None)
         
-        # 创建Flask应用
+        # Create Flask application
         app = Flask(__name__)
         socketio = SocketIO(app, cors_allowed_origins="*")
         
-        # 注册API蓝图
+        # Register API blueprints
         app.register_blueprint(init_bed_api(arduino_controller))
         app.register_blueprint(init_heart_rate_api(arduino_controller))
         app.register_blueprint(init_system_api(arduino_controller, None))
         
-        # 注册WebSocket事件
+        # Register WebSocket events
         register_bed_socketio_events(socketio, arduino_controller)
         register_heart_rate_socketio_events(socketio, arduino_controller)
         
-        # 打印已注册的路由
-        logger.info("已注册的API路由:")
+        # Print registered routes
+        logger.info("Registered API routes:")
         for rule in app.url_map.iter_rules():
             if not str(rule).startswith('/static'):
                 logger.info(f"  {rule} ({', '.join(rule.methods)})")
         
-        logger.info("API初始化测试成功!")
+        logger.info("API initialization test successful!")
         return True
         
     except Exception as e:
-        logger.error(f"API初始化测试失败: {e}")
+        logger.error(f"API initialization test failed: {e}")
         return False
 
 if __name__ == "__main__":

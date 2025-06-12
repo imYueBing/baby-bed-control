@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-WebSocket事件处理包初始化文件
+WebSocket Event Handling Package Initialization File
 
-导出所有WebSocket事件处理函数
+Exports all WebSocket event handling functions
 """
 
-# 导出WebSocket事件注册函数
+# Export WebSocket event registration functions
 from .bed import register_bed_socketio_events
 from .heart_rate import register_heart_rate_socketio_events
 from .video import register_video_socketio_events

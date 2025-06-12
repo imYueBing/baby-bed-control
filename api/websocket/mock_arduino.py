@@ -9,12 +9,12 @@ class MockArduinoController:
         self._thread = None
 
     def get_heart_rate(self):
-        # 返回一个随机的心率值
+        # Return a random heart rate value
         return random.randint(60, 100)
 
     def subscribe_heart_rate(self, callback):
         self.subscribers.append(callback)
-        # 只启动一次线程
+        # Only start the thread once
         if self._thread is None or not self._thread.is_alive():
             self._stop_event.clear()
             self._thread = Thread(target=self._simulate_heart_rate_updates, daemon=True)
@@ -25,10 +25,10 @@ class MockArduinoController:
             heart_rate = self.get_heart_rate()
             for callback in self.subscribers:
                 callback(heart_rate)
-            time.sleep(5)  # 每5秒更新一次心率
+            time.sleep(5)  # Update heart rate every 5 seconds
 
     def stop(self):
-        """停止模拟线程"""
+        """Stop simulation thread"""
         self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=1)

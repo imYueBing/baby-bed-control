@@ -1,1 +1,1 @@
-# 配置包初始化文件 
+# Configuration package initialization file 

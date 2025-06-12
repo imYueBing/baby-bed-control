@@ -2,19 +2,19 @@
 # -*- coding: utf-8 -*-
 
 """
-功能模块包初始化文件
+Feature Modules Package Initialization File
 
-提供所有模块的导出
+Provides exports for all modules
 """
 
-# 导出Arduino控制器相关模块
+# Export Arduino controller related modules
 from .arduino import ArduinoController, BaseArduinoController, BedController, HeartRateController
 
-# 导出相机管理器模块
+# Export camera manager module
 try:
     from .camera import CameraManager
 except ImportError:
-    # 如果相机模块不可用（例如，在非树莓派上运行），提供可用性标志
+    # If camera module is unavailable (e.g., running on non-Raspberry Pi), provide availability flag
     CameraManager = None
     HAS_CAMERA = False
 else:

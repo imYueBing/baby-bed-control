@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-日志工具模块 - 提供统一的日志配置
+Logger Utility Module - Provides unified logging configuration
 """
 
 import logging
@@ -12,76 +12,76 @@ from datetime import datetime
 
 def setup_logger(name='baby_monitor', level=logging.INFO, log_dir='logs'):
     """
-    配置日志记录器
+    Configure logger
     
     Args:
-        name (str): 日志记录器名称
-        level (int): 日志级别
-        log_dir (str): 日志目录
+        name (str): Logger name
+        level (int): Log level
+        log_dir (str): Log directory
         
     Returns:
-        logging.Logger: 配置好的日志记录器
+        logging.Logger: Configured logger
     """
-    # 创建日志目录
+    # Create log directory
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     
-    # 生成日志文件名
+    # Generate log filename
     timestamp = datetime.now().strftime("%Y%m%d")
     log_file = os.path.join(log_dir, f"{name}_{timestamp}.log")
     
-    # 获取记录器
+    # Get logger
     logger = logging.getLogger(name)
     logger.setLevel(level)
     
-    # 如果已经有处理程序，直接返回
+    # If handlers already exist, return directly
     if logger.handlers:
         return logger
     
-    # 创建控制台处理程序
+    # Create console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level)
     
-    # 创建文件处理程序
+    # Create file handler
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setLevel(level)
     
-    # 创建格式器
+    # Create formatter
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # 添加格式器到处理程序
+    # Add formatter to handlers
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
     
-    # 添加处理程序到记录器
+    # Add handlers to logger
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     
-    logger.info(f"日志记录器已配置，日志文件: {log_file}")
+    logger.info(f"Logger configured, log file: {log_file}")
     
     return logger
 
 def get_logger(name='baby_monitor'):
     """
-    获取已配置的日志记录器，如果不存在则创建
+    Get configured logger, create if it doesn't exist
     
     Args:
-        name (str): 日志记录器名称
+        name (str): Logger name
         
     Returns:
-        logging.Logger: 日志记录器
+        logging.Logger: Logger
     """
     logger = logging.getLogger(name)
     
-    # 如果没有处理程序，进行配置
+    # If no handlers, configure
     if not logger.handlers:
-        # 获取环境变量中的日志级别，默认为INFO
+        # Get log level from environment variable, default to INFO
         level_name = os.environ.get('LOG_LEVEL', 'INFO')
         level = getattr(logging, level_name.upper(), logging.INFO)
         
-        # 获取环境变量中的日志目录，默认为'logs'
+        # Get log directory from environment variable, default to 'logs'
         log_dir = os.environ.get('LOG_DIR', 'logs')
         
         return setup_logger(name, level, log_dir)

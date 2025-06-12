@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-设备发现工具 - 帮助发现连接到树莓派的Arduino设备
+Device Discovery Utility - Helps discover Arduino devices connected to Raspberry Pi
 """
 
 import logging
@@ -12,28 +12,28 @@ import serial
 import time
 import json
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 
 def find_arduino_ports():
     """
-    查找可能的Arduino串行端口
+    Find possible Arduino serial ports
     
     Returns:
-        list: 可能的Arduino串行端口列表
+        list: List of possible Arduino serial ports
     """
-    # 不同平台的串行设备路径模式
+    # Serial device path patterns for different platforms
     if os.name == 'nt':  # Windows
         ports = ['COM%s' % (i + 1) for i in range(256)]
     else:  # Linux/Mac
         ports = glob.glob('/dev/tty[A-Za-z]*')
     
-    # Arduino通常使用这些设备名称
+    # Arduino typically uses these device names
     arduino_patterns = [
         'ttyUSB', 'ttyACM', 'cu.usbmodem', 'cu.usbserial'
     ]
     
-    # 过滤可能的Arduino设备
+    # Filter possible Arduino devices
     result = []
     for port in ports:
         for pattern in arduino_patterns:
@@ -45,92 +45,92 @@ def find_arduino_ports():
 
 def test_arduino_port(port, baud_rate=9600, timeout=2):
     """
-    测试端口是否为有效的Arduino设备
+    Test if port is a valid Arduino device
     
     Args:
-        port (str): 要测试的串行端口
-        baud_rate (int): 波特率
-        timeout (float): 读取超时（秒）
+        port (str): Serial port to test
+        baud_rate (int): Baud rate
+        timeout (float): Read timeout in seconds
         
     Returns:
-        bool: 端口是否为有效的Arduino设备
+        bool: Whether the port is a valid Arduino device
     """
     try:
-        # 尝试打开串行端口
+        # Try to open the serial port
         ser = serial.Serial(port, baud_rate, timeout=timeout)
         
-        # 等待Arduino重置
+        # Wait for Arduino reset
         time.sleep(2)
         
-        # 刷新输入缓冲区
+        # Flush input buffer
         ser.flushInput()
         
-        # 发送系统状态请求
+        # Send system status request
         command = json.dumps({'command': 'SYSTEM_STATUS'})
         ser.write(f"{command}\n".encode('utf-8'))
         
-        # 读取响应
+        # Read response
         start_time = time.time()
         while time.time() - start_time < timeout:
             if ser.in_waiting > 0:
                 response = ser.readline().decode('utf-8').strip()
                 try:
                     data = json.loads(response)
-                    # 如果响应包含类型字段，则认为是有效的Arduino设备
+                    # If response contains type field, consider it a valid Arduino device
                     if 'type' in data:
                         ser.close()
                         return True
                 except json.JSONDecodeError:
-                    # 忽略非JSON响应
+                    # Ignore non-JSON responses
                     pass
             
             time.sleep(0.1)
         
-        # 超时，关闭端口
+        # Timeout, close port
         ser.close()
         return False
         
     except (serial.SerialException, OSError) as e:
-        logger.debug(f"测试端口 {port} 时出错: {e}")
+        logger.debug(f"Error testing port {port}: {e}")
         return False
 
 def discover_arduino_device(baud_rate=9600):
     """
-    自动发现并测试连接的Arduino设备
+    Automatically discover and test connected Arduino devices
     
     Args:
-        baud_rate (int): 波特率
+        baud_rate (int): Baud rate
         
     Returns:
-        str or None: 找到的有效Arduino端口，如果未找到则为None
+        str or None: Valid Arduino port found, or None if not found
     """
-    logger.info("正在搜索Arduino设备...")
+    logger.info("Searching for Arduino devices...")
     
-    # 获取可能的端口
+    # Get possible ports
     possible_ports = find_arduino_ports()
-    logger.info(f"发现 {len(possible_ports)} 个可能的串行端口: {possible_ports}")
+    logger.info(f"Found {len(possible_ports)} possible serial ports: {possible_ports}")
     
-    # 测试每个端口
+    # Test each port
     for port in possible_ports:
-        logger.info(f"测试端口 {port}...")
+        logger.info(f"Testing port {port}...")
         if test_arduino_port(port, baud_rate):
-            logger.info(f"在端口 {port} 上找到有效的Arduino设备")
+            logger.info(f"Found valid Arduino device on port {port}")
             return port
     
-    logger.warning("未找到有效的Arduino设备")
+    logger.warning("No valid Arduino device found")
     return None
 
 if __name__ == "__main__":
-    # 如果作为独立脚本运行，进行设备发现
-    # 配置日志
+    # If run as standalone script, perform device discovery
+    # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # 发现设备
+    # Discover device
     port = discover_arduino_device()
     if port:
-        print(f"找到Arduino设备: {port}")
+        print(f"Arduino device found: {port}")
     else:
-        print("未找到Arduino设备") 
+        print("No Arduino device found") 

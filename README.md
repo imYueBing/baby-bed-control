@@ -1,3 +1,192 @@
+# Baby Smart Monitoring System
+
+A Raspberry Pi-based baby smart monitoring system that includes bed height control, heart rate detection, and video monitoring functions to comprehensively monitor the baby's status and support real-time interaction with frontend mobile applications.
+
+## Features
+
+- **Bed Height Control**: Control bed height through Arduino, with Raspberry Pi forwarding control commands
+- **Heart Rate Monitoring**: Connect to heart rate sensors through Arduino to monitor baby's heart rate in real-time
+- **Video Monitoring**: Provide real-time video streaming through a camera connected to the Raspberry Pi
+- **Frontend Interaction**: Provide API interfaces and WebSocket connections for interaction with React Native frontend applications
+
+## System Architecture
+
+- `app.py`: Main application entry point
+- `config/`: Configuration files directory
+- `modules/`: Functional modules directory
+  - `arduino/`: Arduino communication modules
+    - `base_controller.py`: Basic serial communication controller
+    - `bed_controller.py`: Bed controller
+    - `heart_rate_controller.py`: Heart rate monitoring controller
+    - `controller.py`: Arduino master controller (Facade pattern)
+  - `camera/`: Camera modules (video monitoring)
+- `api/`: API service modules
+  - `server.py`: API server main class
+  - `endpoints/`: REST API endpoints
+    - `bed.py`: Bed control API
+    - `heart_rate.py`: Heart rate monitoring API
+    - `video.py`: Video monitoring API
+    - `system.py`: System information API
+  - `websocket/`: WebSocket event handling
+    - `bed.py`: Bed control WebSocket events
+    - `heart_rate.py`: Heart rate monitoring WebSocket events
+    - `video.py`: Video monitoring WebSocket events
+- `utils/`: Utility function modules
+- `arduino_sketch/`: Arduino code
+  - `baby_monitor_arduino.ino`: Code to upload to Arduino
+
+## Installation Guide
+
+1. Install dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+
+2. Configure environment:
+   Create a `.env` file referring to `.env.example`
+
+3. Start the application:
+   ```
+   python app.py
+   ```
+
+## Various Running Modes
+
+The project provides command-line options to run in various modes.
+
+### 1. Start the Complete System (Default)
+
+Start the complete system with all modules (Arduino, camera, API server) enabled.
+
+```bash
+python3 app.py
+```
+
+### 2. Test Camera Module Only
+
+Start only the camera without initializing other system components and display the feed in a local debug window. This mode is useful for quickly testing camera hardware and basic capture functionality.
+
+```bash
+python3 app.py --only-camera
+```
+
+### 3. Start System Without Arduino (Camera and API Server Only)
+
+Start the system (camera, API server) excluding the Arduino controller. Useful when Arduino is not connected or when you don't need to test those functions.
+
+```bash
+python3 app.py --no-arduino
+```
+
+### 4. Start Complete System with Local Camera Debug Window
+
+Start the complete system and additionally open a debug window showing the camera feed on the local screen. Helps to directly monitor the same feed that is being streamed through the API.
+
+```bash
+python3 app.py --debug-camera
+```
+
+You can also customize the window name:
+```bash
+python3 app.py --debug-camera --debug-window-name "My Camera Feed"
+```
+
+### 5. AI Face Detection Control
+
+AI face detection features can be enabled/disabled by default through the `enable_ai_face_detection` setting in the `config/config.json` file.
+
+You can override this setting using command-line arguments:
+
+- **Start with AI face detection enabled:**
+  ```bash
+  python3 app.py --enable-face-detection
+  ```
+  (Enables AI along with the complete system. Can be combined with other flags like `--debug-camera` or `--no-arduino`.)
+
+- **Start with AI face detection disabled:**
+  ```bash
+  python3 app.py --disable-face-detection
+  ```
+
+**Example combination:** Start the system without Arduino, open a local camera debug window, and force-enable AI face detection:
+```bash
+python3 app.py --no-arduino --debug-camera --enable-face-detection
+```
+
+## Hardware Connections
+
+- Arduino: Connected to Raspberry Pi via USB, controlling bed motors and heart rate sensors
+- Camera: Raspberry Pi Camera Module 3 Standard, connected directly to Raspberry Pi USB port or using CSI camera interface
+
+## API Documentation
+
+The system provides complete REST API and WebSocket API. For details, refer to:
+
+- [API Reference Documentation (Chinese)](docs/api_reference_zh.md)
+- [API Reference Documentation (Korean)](docs/api_reference_ko.md)
+- [API Reference Documentation (English)](docs/api_reference_en.md)
+
+## Development Guide
+
+Detailed installation and development guides:
+
+- [Setup Guide (Chinese)](docs/setup_guide_zh.md)
+- [Setup Guide (Korean)](docs/setup_guide_ko.md)
+- [Setup Guide (English)](docs/setup_guide_en.md)
+
+## License
+
+MIT 
+
+## Troubleshooting
+
+If you encounter issues with the system, here are some helpful tools for diagnosing problems:
+
+### Testing the Arduino Communication
+
+Use the `arduino_test_direct.py` script to test direct communication with the Arduino:
+
+```bash
+python arduino_test_direct.py --port /dev/ttyACM0 --baud 9600
+```
+
+This will send a series of test commands to the Arduino and display the responses.
+
+### Testing the API Endpoints
+
+To test if the API server is working correctly, use the `test_frontend_api.py` script:
+
+```bash
+python test_frontend_api.py --host localhost --port 5000 --test-websocket
+```
+
+This script will test all the HTTP API endpoints and WebSocket connections.
+
+### Testing the Frontend Integration
+
+A simple HTML-based test interface is provided to test frontend integration:
+
+1. Start the API server:
+   ```bash
+   python app.py
+   ```
+
+2. Open the `test_frontend.html` file in a web browser
+3. Enter the API host and port (default: localhost:5000)
+4. Click "Connect" to test the API and WebSocket connections
+5. Use the bed control buttons to test API commands
+
+If the frontend tests work but your actual frontend application is having issues, the problem may be related to:
+
+- CORS configuration
+- API endpoint format mismatches
+- WebSocket connection parameters
+- Network connectivity between your frontend and the Raspberry Pi
+
+Check the browser developer console for detailed error messages that can help identify the specific issue.
+
+---
+
 # 아기 스마트 모니터링 시스템 (Baby Smart Monitoring System)
 
 라즈베리파이 기반 아기 스마트 모니터링 시스템으로, 침대 높이 조절, 심박수 감지 및 비디오 모니터링 기능을 포함하여 아기 상태를 종합적으로 모니터링하고 프론트엔드 모바일 애플리케이션과 실시간 상호작용을 지원합니다.
@@ -111,7 +300,7 @@ AI 얼굴 인식 기능은 `config/config.json` 파일의 `enable_ai_face_detect
 **예시 조합:** Arduino 없이 시스템을 시작하고, 로컬 카메라 디버그 창을 열고, AI 얼굴 인식을 강제로 활성화합니다:
 ```bash
 python3 app.py --no-arduino --debug-camera --enable-face-detection
-   ```
+```
 
 ## 하드웨어 연결
 
@@ -124,6 +313,7 @@ python3 app.py --no-arduino --debug-camera --enable-face-detection
 
 - [API 참조 문서 (중국어)](docs/api_reference_zh.md)
 - [API 참조 문서 (한국어)](docs/api_reference_ko.md)
+- [API 참조 문서 (영어)](docs/api_reference_en.md)
 
 ## 개발 가이드
 
@@ -131,6 +321,7 @@ python3 app.py --no-arduino --debug-camera --enable-face-detection
 
 - [설치 가이드 (중국어)](docs/setup_guide_zh.md)
 - [설치 가이드 (한국어)](docs/setup_guide_ko.md)
+- [설치 가이드 (영어)](docs/setup_guide_en.md)
 
 ## 라이선스
 

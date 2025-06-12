@@ -1,158 +1,158 @@
 /*
- * 婴儿监控系统 - Arduino控制程序
+ * Baby Monitoring System - Arduino Control Program
  *
- * 实现床体升降控制和心率监测功能
+ * Implements bed lifting control and heart rate monitoring functionality
  *
- * 硬件连接:
- *   - 步进电机驱动器 (床体升降)
+ * Hardware Connections:
+ *   - Stepper Motor Driver (Bed Lifting)
  *     - STEP -> Arduino 3
  *     - DIR  -> Arduino 4
  *     - EN   -> Arduino 5
- *   - 光电传感器 (上限位)
+ *   - Optical Sensor (Upper Limit)
  *     - OUT  -> Arduino 8
- *   - 光电传感器 (下限位)
+ *   - Optical Sensor (Lower Limit)
  *     - OUT  -> Arduino 9
- *   - 心率传感器
+ *   - Heart Rate Sensor
  *     - OUT  -> Arduino A0
  *
- * 通信协议:
- *   - 使用JSON格式通过串行通信
- *   - 命令格式: {"command": "COMMAND_NAME"}
- *   - 响应格式: {"type": "RESPONSE_TYPE", "value": VALUE}
+ * Communication Protocol:
+ *   - Using JSON format via serial communication
+ *   - Command Format: {"command": "COMMAND_NAME"}
+ *   - Response Format: {"type": "RESPONSE_TYPE", "value": VALUE}
  */
 
 #include <ArduinoJson.h>
 
-// 步进电机引脚
+// Stepper Motor Pins
 #define STEP_PIN 3
 #define DIR_PIN 4
 #define ENABLE_PIN 5
 
-// 限位开关引脚
+// Limit Switch Pins
 #define LIMIT_SWITCH_TOP 8
 #define LIMIT_SWITCH_BOTTOM 9
 
-// 心率传感器引脚
+// Heart Rate Sensor Pin
 #define HEART_RATE_PIN A0
 
-// 步进电机参数
-#define STEPS_PER_MM 100 // 每毫米的步数
-#define MAX_HEIGHT 100   // 最大高度 (mm)
-#define MIN_HEIGHT 0     // 最小高度 (mm)
-#define MOTOR_SPEED 500  // 步进电机速度 (步/秒)
+// Stepper Motor Parameters
+#define STEPS_PER_MM 100 // Steps per millimeter
+#define MAX_HEIGHT 100   // Maximum height (mm)
+#define MIN_HEIGHT 0     // Minimum height (mm)
+#define MOTOR_SPEED 500  // Stepper motor speed (steps/second)
 
-// 心率监测参数
-#define HEART_RATE_SAMPLES 10    // 每次计算的样本数
-#define HEART_RATE_THRESHOLD 550 // 心跳检测阈值
-#define HEART_RATE_INTERVAL 20   // 采样间隔 (ms)
+// Heart Rate Monitoring Parameters
+#define HEART_RATE_SAMPLES 10    // Number of samples for each calculation
+#define HEART_RATE_THRESHOLD 550 // Heart beat detection threshold
+#define HEART_RATE_INTERVAL 20   // Sampling interval (ms)
 
-// 运行状态
+// Running Status
 bool isRunning = false;
 bool isBedMoving = false;
 bool isHeartRateMonitoring = false;
-int currentHeight = 0;                 // 当前高度 (mm)
-int targetHeight = 0;                  // 目标高度 (mm)
-int currentHeartRate = 0;              // 当前心率 (BPM)
-unsigned long lastHeartRateUpdate = 0; // 上次心率更新时间
-unsigned long lastHeartBeat = 0;       // 上次心跳时间
-int heartBeatCount = 0;                // 心跳计数
-bool heartRateStream = false;          // 是否流式发送心率数据
+int currentHeight = 0;                 // Current height (mm)
+int targetHeight = 0;                  // Target height (mm)
+int currentHeartRate = 0;              // Current heart rate (BPM)
+unsigned long lastHeartRateUpdate = 0; // Last heart rate update time
+unsigned long lastHeartBeat = 0;       // Last heartbeat time
+int heartBeatCount = 0;                // Heartbeat count
+bool heartRateStream = false;          // Whether to stream heart rate data
 
-// 串行通信缓冲区
+// Serial Communication Buffer
 const int BUFFER_SIZE = 256;
 char inputBuffer[BUFFER_SIZE];
 int bufferIndex = 0;
 
 void setup()
 {
-  // 初始化串行通信
+  // Initialize serial communication
   Serial.begin(9600);
 
-  // 初始化步进电机引脚
+  // Initialize stepper motor pins
   pinMode(STEP_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(ENABLE_PIN, OUTPUT);
 
-  // 初始化限位开关引脚
+  // Initialize limit switch pins
   pinMode(LIMIT_SWITCH_TOP, INPUT_PULLUP);
   pinMode(LIMIT_SWITCH_BOTTOM, INPUT_PULLUP);
 
-  // 初始化心率传感器引脚
+  // Initialize heart rate sensor pin
   pinMode(HEART_RATE_PIN, INPUT);
 
-  // 禁用电机驱动器
+  // Disable motor driver
   disableMotor();
 
-  // 完成初始化
+  // Complete initialization
   isRunning = true;
 
-  // 发送系统就绪消息
+  // Send system ready message
   sendSystemStatus();
 }
 
 void loop()
 {
-  // 检查串行命令
+  // Check for serial commands
   readSerialCommands();
 
-  // 处理床体移动
+  // Process bed movement
   if (isBedMoving)
   {
     moveBed();
   }
 
-  // 处理心率监测
+  // Process heart rate monitoring
   if (isHeartRateMonitoring)
   {
     monitorHeartRate();
   }
 
-  // 短暂延迟
+  // Short delay
   delay(1);
 }
 
-// 从串行端口读取命令
+// Read commands from serial port
 void readSerialCommands()
 {
   while (Serial.available() > 0)
   {
     char c = Serial.read();
 
-    // 存储字符，直到行结束
+    // Store characters until line end
     if (c == '\n')
     {
-      // 终止字符串
+      // Terminate string
       inputBuffer[bufferIndex] = '\0';
 
-      // 处理命令
+      // Process command
       processCommand(inputBuffer);
 
-      // 重置缓冲区
+      // Reset buffer
       bufferIndex = 0;
     }
     else if (bufferIndex < BUFFER_SIZE - 1)
     {
-      // 添加字符到缓冲区
+      // Add character to buffer
       inputBuffer[bufferIndex++] = c;
     }
   }
 }
 
-// 处理接收到的命令
+// Process received command
 void processCommand(const char *command)
 {
-  // 创建JSON解析器
+  // Create JSON parser
   StaticJsonDocument<256> doc;
   DeserializationError error = deserializeJson(doc, command);
 
-  // 检查解析错误
+  // Check for parsing error
   if (error)
   {
     sendError("Invalid JSON command");
     return;
   }
 
-  // 提取命令名称
+  // Extract command name
   const char *cmdName = doc["command"];
 
   if (!cmdName)
@@ -161,7 +161,7 @@ void processCommand(const char *command)
     return;
   }
 
-  // 处理不同的命令
+  // Process different commands
   if (strcmp(cmdName, "BED_UP") == 0)
   {
     startBedUp();
@@ -200,7 +200,7 @@ void processCommand(const char *command)
   }
 }
 
-// 发送错误消息
+// Send error message
 void sendError(const char *message)
 {
   StaticJsonDocument<256> doc;
@@ -211,7 +211,7 @@ void sendError(const char *message)
   Serial.println();
 }
 
-// 发送床体高度
+// Send bed height
 void sendBedHeight()
 {
   StaticJsonDocument<128> doc;
@@ -222,7 +222,7 @@ void sendBedHeight()
   Serial.println();
 }
 
-// 发送心率数据
+// Send heart rate data
 void sendHeartRate()
 {
   StaticJsonDocument<128> doc;
@@ -233,7 +233,7 @@ void sendHeartRate()
   Serial.println();
 }
 
-// 发送系统状态
+// Send system status
 void sendSystemStatus()
 {
   StaticJsonDocument<256> doc;
@@ -247,24 +247,24 @@ void sendSystemStatus()
   Serial.println();
 }
 
-// 启动床体上升
+// Start bed up
 void startBedUp()
 {
-  // 检查上限位
+  // Check upper limit
   if (digitalRead(LIMIT_SWITCH_TOP) == LOW)
   {
     sendError("Bed already at top position");
     return;
   }
 
-  // 设置方向和启用
-  digitalWrite(DIR_PIN, HIGH); // 上升方向
+  // Set direction and enable
+  digitalWrite(DIR_PIN, HIGH); // Up direction
   enableMotor();
 
-  // 开始移动
+  // Start moving
   isBedMoving = true;
 
-  // 发送确认
+  // Send confirmation
   StaticJsonDocument<128> doc;
   doc["type"] = "BED_CONTROL";
   doc["action"] = "UP";
@@ -274,24 +274,24 @@ void startBedUp()
   Serial.println();
 }
 
-// 启动床体下降
+// Start bed down
 void startBedDown()
 {
-  // 检查下限位
+  // Check lower limit
   if (digitalRead(LIMIT_SWITCH_BOTTOM) == LOW)
   {
     sendError("Bed already at bottom position");
     return;
   }
 
-  // 设置方向和启用
-  digitalWrite(DIR_PIN, LOW); // 下降方向
+  // Set direction and enable
+  digitalWrite(DIR_PIN, LOW); // Down direction
   enableMotor();
 
-  // 开始移动
+  // Start moving
   isBedMoving = true;
 
-  // 发送确认
+  // Send confirmation
   StaticJsonDocument<128> doc;
   doc["type"] = "BED_CONTROL";
   doc["action"] = "DOWN";
@@ -301,14 +301,14 @@ void startBedDown()
   Serial.println();
 }
 
-// 停止床体移动
+// Stop bed movement
 void stopBed()
 {
-  // 停止移动
+  // Stop moving
   isBedMoving = false;
   disableMotor();
 
-  // 发送确认
+  // Send confirmation
   StaticJsonDocument<128> doc;
   doc["type"] = "BED_CONTROL";
   doc["action"] = "STOP";
@@ -318,31 +318,31 @@ void stopBed()
   Serial.println();
 }
 
-// 移动床体
+// Move bed
 void moveBed()
 {
-  // 检查限位开关
+  // Check limit switches
   bool topLimitReached = (digitalRead(LIMIT_SWITCH_TOP) == LOW);
   bool bottomLimitReached = (digitalRead(LIMIT_SWITCH_BOTTOM) == LOW);
 
   if ((digitalRead(DIR_PIN) == HIGH && topLimitReached) ||
       (digitalRead(DIR_PIN) == LOW && bottomLimitReached))
   {
-    // 到达限位，停止移动
+    // Reached limit, stop moving
     stopBed();
     return;
   }
 
-  // 发送脉冲
+  // Send pulse
   digitalWrite(STEP_PIN, HIGH);
-  delayMicroseconds(1000); // 控制速度
+  delayMicroseconds(1000); // Control speed
   digitalWrite(STEP_PIN, LOW);
-  delayMicroseconds(1000); // 控制速度
+  delayMicroseconds(1000); // Control speed
 
-  // 更新高度
+  // Update height
   if (digitalRead(DIR_PIN) == HIGH)
   {
-    // 上升
+    // Up
     currentHeight += 1.0 / STEPS_PER_MM;
     if (currentHeight > MAX_HEIGHT)
     {
@@ -351,7 +351,7 @@ void moveBed()
   }
   else
   {
-    // 下降
+    // Down
     currentHeight -= 1.0 / STEPS_PER_MM;
     if (currentHeight < MIN_HEIGHT)
     {
@@ -360,22 +360,22 @@ void moveBed()
   }
 }
 
-// 启用电机
+// Enable motor
 void enableMotor()
 {
-  digitalWrite(ENABLE_PIN, LOW); // 低电平启用
+  digitalWrite(ENABLE_PIN, LOW); // Low level enable
 }
 
-// 禁用电机
+// Disable motor
 void disableMotor()
 {
-  digitalWrite(ENABLE_PIN, HIGH); // 高电平禁用
+  digitalWrite(ENABLE_PIN, HIGH); // High level disable
 }
 
-// 监测心率
+// Monitor heart rate
 void monitorHeartRate()
 {
-  // 确保已经初始化
+  // Ensure initialized
   if (!isHeartRateMonitoring)
   {
     isHeartRateMonitoring = true;
@@ -383,48 +383,48 @@ void monitorHeartRate()
     lastHeartBeat = 0;
   }
 
-  // 读取传感器值
+  // Read sensor value
   int sensorValue = analogRead(HEART_RATE_PIN);
   unsigned long currentTime = millis();
 
-  // 检测心跳
+  // Detect heartbeat
   static int lastSensorValue = 0;
   static bool isPeak = false;
 
-  // 检测上升沿越过阈值（心跳峰值）
+  // Detect rising edge crossing threshold (heartbeat peak)
   if (sensorValue > HEART_RATE_THRESHOLD && lastSensorValue <= HEART_RATE_THRESHOLD)
   {
     isPeak = true;
   }
-  // 检测下降沿（心跳完成）
+  // Detect falling edge (heartbeat completion)
   else if (isPeak && sensorValue < HEART_RATE_THRESHOLD)
   {
     isPeak = false;
 
-    // 计算两次心跳之间的时间
+    // Calculate time between two heartbeats
     if (lastHeartBeat > 0)
     {
       unsigned long timeBetweenBeats = currentTime - lastHeartBeat;
 
-      // 心跳间隔在合理范围内
+      // Heartbeat interval within reasonable range
       if (timeBetweenBeats > 300 && timeBetweenBeats < 2000)
       {
-        // 增加计数
+        // Increase count
         heartBeatCount++;
 
-        // 计算心率 (BPM)
+        // Calculate heart rate (BPM)
         if (heartBeatCount >= HEART_RATE_SAMPLES)
         {
-          // 计算平均时间
+          // Calculate average time
           unsigned long totalTime = currentTime - lastHeartRateUpdate;
           float beatsPerSecond = (float)heartBeatCount / (totalTime / 1000.0);
           currentHeartRate = (int)(beatsPerSecond * 60.0);
 
-          // 重置计数
+          // Reset count
           heartBeatCount = 0;
           lastHeartRateUpdate = currentTime;
 
-          // 发送心率数据
+          // Send heart rate data
           if (heartRateStream)
           {
             sendHeartRate();
@@ -433,10 +433,10 @@ void monitorHeartRate()
       }
     }
 
-    // 保存心跳时间
+    // Save heartbeat time
     lastHeartBeat = currentTime;
   }
 
-  // 保存上一次传感器值
+  // Save last sensor value
   lastSensorValue = sensorValue;
 }

@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-直接测试Arduino通信的脚本
-发送简单命令并检查响应
+Direct Arduino Communication Test Script
+Sends simple commands and checks responses
 """
 
 import serial
@@ -12,101 +12,101 @@ import sys
 import argparse
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Arduino通信测试')
+    parser = argparse.ArgumentParser(description='Arduino Communication Test')
     parser.add_argument('--port', type=str, default='/dev/ttyACM0', 
-                        help='Arduino串口设备 (Raspberry Pi上通常是/dev/ttyACM0，macOS上可能是/dev/tty.usbmodem*)')
-    parser.add_argument('--baud', type=int, default=9600, help='波特率')
-    parser.add_argument('--debug', action='store_true', help='显示调试信息')
+                        help='Arduino serial device (typically /dev/ttyACM0 on Raspberry Pi, /dev/tty.usbmodem* on macOS)')
+    parser.add_argument('--baud', type=int, default=9600, help='Baud rate')
+    parser.add_argument('--debug', action='store_true', help='Display debug information')
     return parser.parse_args()
 
 def main():
     args = parse_args()
     
-    print(f"尝试连接到 {args.port} (波特率: {args.baud})...")
+    print(f"Attempting to connect to {args.port} (baud rate: {args.baud})...")
     
     try:
-        # 打开串口连接
+        # Open serial connection
         ser = serial.Serial(
             port=args.port,
             baudrate=args.baud,
-            timeout=1  # 读取超时1秒
+            timeout=1  # 1 second read timeout
         )
         
-        # 等待Arduino重置（打开串口会导致Arduino重置）
-        print("等待Arduino重置和初始化...")
+        # Wait for Arduino reset (opening serial connection causes Arduino to reset)
+        print("Waiting for Arduino reset and initialization...")
         time.sleep(2)
         
-        # 清空任何可能在缓冲区中的数据
+        # Clear any data that might be in the buffer
         ser.flushInput()
         
-        print("连接成功！开始测试命令...")
+        print("Connection successful! Starting command tests...")
         print("-" * 50)
         
-        # 定义测试命令列表
+        # Define list of test commands
         commands = [
             "UP",
             "DOWN",
             "STOP",
             "GET_HEART_RATE",
             "GET_STATUS",
-            "INVALID_COMMAND"  # 测试未知命令处理
+            "INVALID_COMMAND"  # Test unknown command handling
         ]
         
-        # 测试每个命令
+        # Test each command
         for cmd in commands:
-            print(f"\n发送命令: '{cmd}'")
+            print(f"\nSending command: '{cmd}'")
             
-            # 确保命令以换行符结束
+            # Ensure command ends with newline
             if not cmd.endswith('\n'):
                 cmd_to_send = cmd + '\n'
             else:
                 cmd_to_send = cmd
                 
-            # 发送命令
+            # Send command
             ser.write(cmd_to_send.encode('utf-8'))
             
-            # 调试信息：显示发送的原始字节
+            # Debug info: show raw bytes sent
             if args.debug:
-                print(f"发送字节: {[b for b in cmd_to_send.encode('utf-8')]}")
+                print(f"Sent bytes: {[b for b in cmd_to_send.encode('utf-8')]}")
             
-            # 等待并读取响应
-            print("等待响应...")
+            # Wait and read response
+            print("Waiting for response...")
             timeout_start = time.time()
             response_received = False
             
-            # 尝试读取响应，最多等待3秒
+            # Try to read response, wait up to 3 seconds
             while time.time() - timeout_start < 3:
                 if ser.in_waiting > 0:
                     response = ser.readline().decode('utf-8').strip()
-                    print(f"收到响应: '{response}'")
+                    print(f"Received response: '{response}'")
                     response_received = True
                     break
                 time.sleep(0.1)
             
             if not response_received:
-                print("未收到响应（超时）")
+                print("No response received (timeout)")
             
-            # 在命令之间等待一小段时间
+            # Wait a short time between commands
             time.sleep(0.5)
         
-        print("\n测试完成！")
+        print("\nTests completed!")
         
-        # 关闭连接
+        # Close connection
         ser.close()
-        print("串口连接已关闭")
+        print("Serial connection closed")
         
     except serial.SerialException as e:
-        print(f"串口连接错误: {e}")
+        print(f"Serial connection error: {e}")
         return 1
     except KeyboardInterrupt:
-        print("\n用户中断，正在关闭连接...")
+        print("\nUser interrupted, closing connection...")
         try:
             ser.close()
         except:
             pass
         return 0
     except Exception as e:
-        print(f"发生意外错误: {e}")
+        print(f"Unexpected error occurred: {e}")
         return 1
     
     return 0

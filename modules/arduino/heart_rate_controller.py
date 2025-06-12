@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-心率控制器模块 - 负责获取和处理婴儿心率数据
+Heart Rate Controller Module - Responsible for obtaining and processing baby heart rate data
 """
 
 import logging
@@ -10,20 +10,20 @@ import threading
 import time
 from .base_controller import BaseArduinoController
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 
 class HeartRateController(BaseArduinoController):
-    """简化的心率监测器，模拟定期请求并处理简单响应"""
+    """Simplified heart rate monitor that periodically requests and processes simple responses"""
     
     def __init__(self, port, baud_rate=9600, timeout=1):
         """
-        初始化心率控制器
+        Initialize heart rate controller
         
         Args:
-            port (str): 串行端口（例如 '/dev/ttyUSB0'）
-            baud_rate (int): 波特率
-            timeout (float): 读取超时（秒）
+            port (str): Serial port (e.g., '/dev/ttyUSB0')
+            baud_rate (int): Baud rate
+            timeout (float): Read timeout (seconds)
         """
         super().__init__(port, baud_rate, timeout)
         self.current_heart_rate = None
@@ -36,53 +36,53 @@ class HeartRateController(BaseArduinoController):
         self.monitoring_interval = 10 # seconds
     
     def _handle_specific_response(self, response_line):
-        """处理来自Arduino的特定于心率的响应"""
-        logger.debug(f"处理心率响应: '{response_line}'")
+        """Process heart rate specific responses from Arduino"""
+        logger.debug(f"Processing heart rate response: '{response_line}'")
         
-        # 尝试多种可能的响应格式
+        # Try multiple possible response formats
         if response_line.startswith("HEART_RATE_DATA:"):
             try:
                 rate_str = response_line.split(":")[1].strip()
                 self.current_heart_rate = int(rate_str)
                 self.last_heart_rate_response = response_line
                 self.consecutive_failures = 0 # Reset failures on successful response
-                logger.info(f"心率更新: {self.current_heart_rate} BPM")
+                logger.info(f"Heart rate updated: {self.current_heart_rate} BPM")
                 self._notify_subscribers(self.current_heart_rate)
             except (IndexError, ValueError) as e:
-                logger.warning(f"解析心率数据失败 '{response_line}': {e}")
+                logger.warning(f"Failed to parse heart rate data '{response_line}': {e}")
                 self.consecutive_failures += 1
-        # 检查其他可能的响应格式 (例如 [BPM] 格式)
+        # Check other possible response formats (e.g., [BPM] format)
         elif response_line.startswith("[BPM]"):
             try:
                 rate_str = response_line.replace("[BPM]", "").strip()
                 self.current_heart_rate = int(rate_str)
                 self.last_heart_rate_response = response_line
                 self.consecutive_failures = 0
-                logger.info(f"检测到[BPM]格式心率: {self.current_heart_rate} BPM")
+                logger.info(f"Detected [BPM] format heart rate: {self.current_heart_rate} BPM")
                 self._notify_subscribers(self.current_heart_rate)
             except (ValueError) as e:
-                logger.warning(f"解析[BPM]格式心率数据失败 '{response_line}': {e}")
+                logger.warning(f"Failed to parse [BPM] format heart rate data '{response_line}': {e}")
                 self.consecutive_failures += 1
-        # 新增: 检查 [HEART] 格式
+        # New: Check [HEART] format
         elif response_line.startswith("[HEART]"):
             try:
                 rate_str = response_line.replace("[HEART]", "").strip()
                 self.current_heart_rate = int(rate_str)
                 self.last_heart_rate_response = response_line
                 self.consecutive_failures = 0
-                logger.info(f"检测到[HEART]格式心率: {self.current_heart_rate} BPM")
+                logger.info(f"Detected [HEART] format heart rate: {self.current_heart_rate} BPM")
                 self._notify_subscribers(self.current_heart_rate)
             except (ValueError) as e:
-                logger.warning(f"解析[HEART]格式心率数据失败 '{response_line}': {e}")
+                logger.warning(f"Failed to parse [HEART] format heart rate data '{response_line}': {e}")
                 self.consecutive_failures += 1
         elif response_line.startswith("UNKNOWN_CMD:"):
-            logger.warning(f"HeartRateController 收到未知命令回复: {response_line}")
+            logger.warning(f"HeartRateController received unknown command reply: {response_line}")
             self.consecutive_failures += 1
         else:
-            # 如果是其他响应，尝试在响应中寻找心率数据
-            logger.debug(f"HeartRateController收到非预期响应: {response_line}")
+            # If it's another response, try to find heart rate data in the response
+            logger.debug(f"HeartRateController received unexpected response: {response_line}")
             
-            # 尝试查找心率数据模式 - 例如"HEART_RATE=XX"或"HEART=XX"
+            # Try to find heart rate data patterns - e.g., "HEART_RATE=XX" or "HEART=XX"
             if "HEART_RATE=" in response_line:
                 try:
                     parts = response_line.split("HEART_RATE=")
@@ -90,12 +90,12 @@ class HeartRateController(BaseArduinoController):
                     self.current_heart_rate = int(rate_str)
                     self.last_heart_rate_response = response_line
                     self.consecutive_failures = 0
-                    logger.info(f"从状态响应中提取心率: {self.current_heart_rate} BPM")
+                    logger.info(f"Extracted heart rate from status response: {self.current_heart_rate} BPM")
                     self._notify_subscribers(self.current_heart_rate)
                     return
                 except (IndexError, ValueError) as e:
-                    logger.warning(f"从状态响应中提取心率失败 '{response_line}': {e}")
-            # 新增: 检查 HEART= 格式 (用于STATUS响应)
+                    logger.warning(f"Failed to extract heart rate from status response '{response_line}': {e}")
+            # New: Check HEART= format (for STATUS responses)
             elif "HEART=" in response_line:
                 try:
                     parts = response_line.split("HEART=")
@@ -103,51 +103,51 @@ class HeartRateController(BaseArduinoController):
                     self.current_heart_rate = int(rate_str)
                     self.last_heart_rate_response = response_line
                     self.consecutive_failures = 0
-                    logger.info(f"从状态响应中提取心率: {self.current_heart_rate} BPM")
+                    logger.info(f"Extracted heart rate from status response: {self.current_heart_rate} BPM")
                     self._notify_subscribers(self.current_heart_rate)
                     return
                 except (IndexError, ValueError) as e:
-                    logger.warning(f"从状态响应中提取心率失败 '{response_line}': {e}")
+                    logger.warning(f"Failed to extract heart rate from status response '{response_line}': {e}")
             
             self.consecutive_failures += 1
     
     def _notify_subscribers(self, heart_rate):
         """
-        通知所有心率订阅者
+        Notify all heart rate subscribers
         
         Args:
-            heart_rate (int): 心率值
+            heart_rate (int): Heart rate value
         """
         for callback in self._subscribers:
             try:
                 callback(heart_rate)
             except Exception as e:
-                logger.error(f"调用心率订阅者回调时出错: {e}")
+                logger.error(f"Error calling heart rate subscriber callback: {e}")
     
     def get_heart_rate(self):
-        """获取当前心率 (将通过后台线程更新)"""
-        # 添加详细日志
-        logger.info("正在请求心率数据...")
+        """Get current heart rate (will be updated by background thread)"""
+        # Add detailed logging
+        logger.info("Requesting heart rate data...")
         
-        # 发送命令并确保发送成功
+        # Send command and ensure it was sent successfully
         success = self.send_command("GET_HEART_RATE")
         if success:
-            logger.info("GET_HEART_RATE命令已发送，等待响应...")
-            # 等待一小段时间以接收响应
+            logger.info("GET_HEART_RATE command sent, waiting for response...")
+            # Wait a short time to receive response
             time.sleep(0.5)
         else:
-            logger.error("发送GET_HEART_RATE命令失败")
+            logger.error("Failed to send GET_HEART_RATE command")
         
-        # 记录返回的心率值，方便调试
-        logger.info(f"当前心率值: {self.current_heart_rate}")
+        # Log the returned heart rate value for debugging
+        logger.info(f"Current heart rate value: {self.current_heart_rate}")
         return self.current_heart_rate
     
     def subscribe_heart_rate(self, callback):
         """
-        订阅心率数据
+        Subscribe to heart rate data
         
         Args:
-            callback (callable): 当收到新心率数据时调用的回调函数，参数为心率值
+            callback (callable): Callback function to call when new heart rate data is received, with heart rate as parameter
         """
         if callback not in self._subscribers:
             self._subscribers.append(callback)
@@ -155,10 +155,10 @@ class HeartRateController(BaseArduinoController):
     
     def unsubscribe_heart_rate(self, callback):
         """
-        取消订阅心率数据
+        Unsubscribe from heart rate data
         
         Args:
-            callback (callable): 先前注册的回调函数
+            callback (callable): Previously registered callback function
         """
         if callback in self._subscribers:
             self._subscribers.remove(callback)
@@ -166,33 +166,33 @@ class HeartRateController(BaseArduinoController):
             self.stop_monitoring()
     
     def _monitoring_loop(self):
-        logger.info("启动心率监测循环...")
+        logger.info("Starting heart rate monitoring loop...")
         while not self._stop_monitoring.is_set():
             if not self.is_connected:
-                logger.warning("心率监测：Arduino未连接，暂停。")
+                logger.warning("Heart rate monitoring: Arduino not connected, pausing.")
                 self.consecutive_failures +=1 # Increment failures if not connected
             else:
-                logger.debug("心率监测：发送GET_HEART_RATE命令")
+                logger.debug("Heart rate monitoring: Sending GET_HEART_RATE command")
                 success = self.send_command("GET_HEART_RATE")
                 if not success:
                     self.consecutive_failures += 1
                 # Response processing and failure counting will happen in _handle_specific_response
             
             if self.consecutive_failures >= self.max_failures:
-                logger.error(f"连续 {self.max_failures} 次未能获取有效心率响应，停止监测。")
+                logger.error(f"Failed to get valid heart rate response {self.max_failures} consecutive times, stopping monitoring.")
                 self.stop_monitoring() # This will set the event and loop will exit
                 break # Exit loop immediately
 
             # Wait for the next interval, checking the stop event frequently
             self._stop_monitoring.wait(self.monitoring_interval)
-        logger.info("心率监测循环已停止。")
+        logger.info("Heart rate monitoring loop has stopped.")
 
     def start_monitoring(self):
         if self._monitoring_thread and self._monitoring_thread.is_alive():
-            logger.debug("心率监测已在运行中。")
+            logger.debug("Heart rate monitoring is already running.")
             return
         if not self.is_connected:
-            logger.warning("无法启动心率监测：Arduino未连接。")
+            logger.warning("Cannot start heart rate monitoring: Arduino not connected.")
             return
             
         self._stop_monitoring.clear() # Clear stop event before starting
@@ -202,13 +202,13 @@ class HeartRateController(BaseArduinoController):
         self._monitoring_thread.start()
 
     def stop_monitoring(self):
-        logger.info("正在停止心率监测...")
+        logger.info("Stopping heart rate monitoring...")
         self._stop_monitoring.set() # Signal the thread to stop
         # Joining the thread will be handled by the main close() method if necessary
 
     def close(self):
         self.stop_monitoring() # Ensure monitoring stops
         if self._monitoring_thread and self._monitoring_thread.is_alive():
-             logger.debug("等待心率监测线程结束...")
+             logger.debug("Waiting for heart rate monitoring thread to end...")
              self._monitoring_thread.join(timeout=2) # Wait for thread to finish
         super().close() # Call parent's close method 

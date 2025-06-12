@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-API服务器模块 - 为前端应用提供HTTP和WebSocket接口
+API Server Module - Provides HTTP and WebSocket interfaces for frontend applications
 """
 
 import logging
@@ -14,14 +14,14 @@ import argparse
 import signal
 import sys
 
-# 导入API端点
+# Import API endpoints
 from .endpoints.bed import bed_api, init_bed_api
 from .endpoints.heart_rate import heart_rate_api, init_heart_rate_api
 from .endpoints.video import video_api, init_video_api
 from .endpoints.system import system_api, init_system_api
-from .endpoints.face_tracker import face_tracker_bp  # 导入自动人脸跟踪API端点
+from .endpoints.face_tracker import face_tracker_bp  # Import auto face tracking API endpoint
 
-# 导入WebSocket事件处理
+# Import WebSocket event handlers
 from .websocket.bed import register_bed_socketio_events
 from .websocket.heart_rate import register_heart_rate_socketio_events
 from .websocket.video import register_video_socketio_events
@@ -30,22 +30,22 @@ from .websocket.mock_arduino import MockArduinoController
 
 
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 
 class APIServer:
-    """API服务器类，为前端应用提供接口"""
+    """API Server class, provides interfaces for frontend applications"""
     
     def __init__(self, arduino_controller, camera_manager, host='0.0.0.0', port=5000, debug=False):
         """
-        初始化API服务器
+        Initialize API server
         
         Args:
-            arduino_controller: Arduino控制器实例，可以为None表示不使用Arduino
-            camera_manager: 摄像头管理器实例
-            host (str): 监听主机
-            port (int): 监听端口
-            debug (bool): 是否启用调试模式
+            arduino_controller: Arduino controller instance, can be None to indicate not using Arduino
+            camera_manager: Camera manager instance
+            host (str): Host to listen on
+            port (int): Port to listen on
+            debug (bool): Whether to enable debug mode
         """
         self.arduino_controller = arduino_controller
         self.camera_manager = camera_manager
@@ -55,74 +55,74 @@ class APIServer:
         self.server_thread = None
         self.is_running = False
         
-        # 添加一个标志，表示Arduino控制器是否可用
+        # Add a flag to indicate whether Arduino controller is available
         self.arduino_available = arduino_controller is not None
         
-        # 如果Arduino控制器不可用，记录警告日志
+        # Log a warning if Arduino controller is not available
         if not self.arduino_available:
-            logger.warning("Arduino控制器未提供，将以'仅相机模式'运行。所有与Arduino相关的功能将不可用或返回模拟数据。")
+            logger.warning("Arduino controller not provided, will run in 'camera-only mode'. All Arduino-related functions will be unavailable or return simulated data.")
         
-        # 初始化Flask应用
+        # Initialize Flask application
         self.app = Flask(__name__)
         self.socketio = SocketIO(self.app, cors_allowed_origins="*", async_mode='threading')
         
-        # 配置API蓝图
+        # Configure API blueprints
         self._setup_blueprints()
         
-        # 配置WebSocket事件
+        # Configure WebSocket events
         self._setup_socketio_events()
     
     def _setup_blueprints(self):
-        """配置API蓝图"""
-        # 注册床体控制API
+        """Configure API blueprints"""
+        # Register bed control API
         self.app.register_blueprint(init_bed_api(self.arduino_controller))
         
-        # 注册心率监测API
+        # Register heart rate monitoring API
         self.app.register_blueprint(init_heart_rate_api(self.arduino_controller))
         
-        # 注册视频监控API
+        # Register video monitoring API
         self.app.register_blueprint(init_video_api(self.camera_manager))
         
-        # 注册系统信息API
+        # Register system information API
         self.app.register_blueprint(init_system_api(self.arduino_controller, self.camera_manager))
         
-        # 注册自动人脸跟踪API
+        # Register auto face tracking API
         self.app.register_blueprint(face_tracker_bp)
     
     def _setup_socketio_events(self):
-        """配置WebSocket事件"""
-        # 连接和断开事件
+        """Configure WebSocket events"""
+        # Connection and disconnection events
         @self.socketio.on('connect')
         def handle_connect():
-            """处理WebSocket连接"""
-            logger.info("新的WebSocket客户端已连接")
-            self.socketio.emit('welcome', {'message': '已连接到婴儿监控系统'})
+            """Handle WebSocket connection"""
+            logger.info("New WebSocket client connected")
+            self.socketio.emit('welcome', {'message': 'Connected to Baby Monitoring System'})
         
         @self.socketio.on('disconnect')
         def handle_disconnect():
-            """处理WebSocket断开连接"""
-            logger.info("WebSocket客户端已断开连接")
+            """Handle WebSocket disconnection"""
+            logger.info("WebSocket client disconnected")
         
-        # 注册视频相关的WebSocket事件 (这个不依赖Arduino)
+        # Register video-related WebSocket events (these don't depend on Arduino)
         register_video_socketio_events(self.socketio, self.camera_manager)
         
-        # 只有在Arduino可用时，才注册依赖Arduino的WebSocket事件
+        # Only register Arduino-dependent WebSocket events if Arduino is available
         if self.arduino_available:
-            logger.info("Arduino 可用，注册 Arduino 相关 WebSocket 事件...")
+            logger.info("Arduino available, registering Arduino-related WebSocket events...")
             register_bed_socketio_events(self.socketio, self.arduino_controller)
             register_heart_rate_socketio_events(self.socketio, self.arduino_controller)
         else:
-            logger.warning("Arduino 不可用，跳过 Arduino 相关 WebSocket 事件的注册。")
-            # 可选：在这里可以为床体和心率注册一些模拟的/提示性的WebSocket事件
-            # 例如，当客户端请求时，返回 "Arduino not connected"
+            logger.warning("Arduino not available, skipping registration of Arduino-related WebSocket events.")
+            # Optional: Here you can register some simulated/informative WebSocket events for bed and heart rate
+            # For example, return "Arduino not connected" when client requests
             self._setup_mock_arduino_socketio_events()
         
-        # 注册自动人脸跟踪相关的WebSocket事件
+        # Register auto face tracking related WebSocket events
         self._setup_face_tracker_socketio_events()
     
     def _setup_mock_arduino_socketio_events(self):
-        """配置当Arduino不可用时的模拟WebSocket事件处理"""
-        @self.socketio.on('request_bed_status') # 假设有这个事件
+        """Configure mock WebSocket event handlers when Arduino is not available"""
+        @self.socketio.on('request_bed_status') # Assuming this event exists
         def handle_mock_bed_status():
             self.socketio.emit('bed_status_update', {
                 'status': 'error',
@@ -139,10 +139,10 @@ class APIServer:
             })
     
     def _setup_face_tracker_socketio_events(self):
-        """配置自动人脸跟踪相关的WebSocket事件"""
+        """Configure auto face tracking related WebSocket events"""
         @self.socketio.on('request_face_tracker_status')
         def handle_face_tracker_status():
-            """处理请求自动人脸跟踪状态"""
+            """Handle request for auto face tracking status"""
             face_tracker = self.app.face_tracker if hasattr(self.app, 'face_tracker') else None
             
             if not face_tracker:
@@ -165,7 +165,7 @@ class APIServer:
         
         @self.socketio.on('start_face_tracker')
         def handle_start_face_tracker(data=None):
-            """处理启动自动人脸跟踪请求"""
+            """Handle request to start auto face tracking"""
             face_tracker = self.app.face_tracker if hasattr(self.app, 'face_tracker') else None
             
             if not face_tracker:
@@ -175,7 +175,7 @@ class APIServer:
                 })
                 return
             
-            # 更新配置（如果提供）
+            # Update configuration (if provided)
             if data:
                 if 'scan_interval' in data:
                     face_tracker.scan_interval = float(data['scan_interval'])
@@ -184,7 +184,7 @@ class APIServer:
                 if 'face_detection_threshold' in data:
                     face_tracker.face_detection_threshold = int(data['face_detection_threshold'])
             
-            # 启动跟踪器
+            # Start tracker
             success = face_tracker.start()
             
             if success:
@@ -202,7 +202,7 @@ class APIServer:
         
         @self.socketio.on('stop_face_tracker')
         def handle_stop_face_tracker():
-            """处理停止自动人脸跟踪请求"""
+            """Handle request to stop auto face tracking"""
             face_tracker = self.app.face_tracker if hasattr(self.app, 'face_tracker') else None
             
             if not face_tracker:
@@ -212,7 +212,7 @@ class APIServer:
                 })
                 return
             
-            # 停止跟踪器
+            # Stop tracker
             face_tracker.stop()
             
             self.socketio.emit('face_tracker_response', {
@@ -222,14 +222,14 @@ class APIServer:
             })
     
     def start(self):
-        """启动服务器"""
+        """Start server"""
         if self.is_running:
-            logger.warning("服务器已经在运行")
+            logger.warning("Server is already running")
             return
         
-        logger.info(f"启动API服务器: {self.host}:{self.port}")
+        logger.info(f"Starting API server: {self.host}:{self.port}")
         
-        # 使用线程运行服务器
+        # Run server in a thread
         self.is_running = True
         self.server_thread = threading.Thread(
             target=self._run_server
@@ -237,184 +237,159 @@ class APIServer:
         self.server_thread.daemon = True
         self.server_thread.start()
         
-        logger.info("API服务器已启动")
+        logger.info("API server started")
     
     def _run_server(self):
-        """运行服务器（在线程中）"""
+        """Run server (in thread)"""
         try:
             self.socketio.run(
                 self.app,
                 host=self.host,
                 port=self.port,
                 debug=self.debug,
-                use_reloader=False  # 禁用重载器，避免在线程中启动时的问题
+                use_reloader=False  # Disable reloader to avoid issues when starting in a thread
             )
         except Exception as e:
-            logger.error(f"API服务器运行错误: {e}")
+            logger.error(f"Error running API server: {e}")
             self.is_running = False
     
     def stop(self):
-        """停止服务器"""
+        """Stop server"""
         if not self.is_running:
-            logger.warning("服务器未运行")
+            logger.warning("Server is not running")
             return
         
-        logger.info("停止API服务器")
-        
-        # 标记为停止
+        logger.info("Stopping API server")
         self.is_running = False
         
-        # 关闭socket.io
-        self.socketio.stop()
-        
-        # 等待线程结束
-        if self.server_thread and self.server_thread.is_alive():
-            # 最多等待5秒
-            self.server_thread.join(timeout=5)
-        
-        logger.info("API服务器已停止")
-        
-    def start_camera_debug(self, window_name="摄像头调试"):
-        """
-        启动摄像头调试窗口
-        
-        Args:
-            window_name (str): 窗口名称
+        # Stop the server
+        try:
+            # Request shutdown
+            import requests
+            try:
+                requests.get(f"http://localhost:{self.port}/shutdown", timeout=0.1)
+            except requests.exceptions.RequestException:
+                pass  # Expected to fail as server shuts down
             
-        Returns:
-            bool: 是否成功启动调试窗口
-        """
+            # Wait for thread to finish
+            if self.server_thread and self.server_thread.is_alive():
+                self.server_thread.join(timeout=5.0)
+        except Exception as e:
+            logger.error(f"Error stopping API server: {e}")
+        
+        logger.info("API server stopped")
+    
+    def start_camera_debug(self, window_name="Camera Debug"):
+        """Start camera debug window"""
         if not self.camera_manager:
-            logger.error("摄像头管理器未初始化")
+            logger.warning("Cannot start camera debug: Camera manager not available")
             return False
-            
-        return self.camera_manager.start_debug_window(window_name=window_name)
         
+        try:
+            self.camera_manager.start_debug_window(window_name)
+            logger.info(f"Camera debug window started: {window_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error starting camera debug window: {e}")
+            return False
+    
     def stop_camera_debug(self):
-        """停止摄像头调试窗口"""
+        """Stop camera debug window"""
         if not self.camera_manager:
-            logger.error("摄像头管理器未初始化")
             return
-            
-        self.camera_manager.stop_debug_window()
+        
+        self.camera_manager.close_debug_window()
+        logger.info("Camera debug window closed")
 
 def parse_args():
-    """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='婴儿智能监控系统')
-    parser.add_argument('--debug-camera', action='store_true', 
-                        help='启用摄像头调试窗口，在本地显示摄像头画面')
-    parser.add_argument('--debug-window-name', type=str, default='摄像头调试',
-                        help='调试窗口名称')
-    parser.add_argument('--only-camera', action='store_true', 
-                        help='仅测试摄像头，不启动完整系统')
-    parser.add_argument('--no-arduino', action='store_true',
-                        help='不使用Arduino控制器，以仅相机模式运行')
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="Baby Monitoring System API Server")
+    parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to listen on')
+    parser.add_argument('--port', type=int, default=5000, help='Port to listen on')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--debug-camera', action='store_true', help='Enable camera debug window')
+    parser.add_argument('--no-arduino', action='store_true', help='Run without Arduino controller')
     return parser.parse_args()
 
 def setup(args=None):
-    """初始化系统组件"""
-    logger.info("婴儿智能监控系统启动中...")
-
-    config = get_config()
-
+    """Set up the API server"""
+    if args is None:
+        args = parse_args()
+    
+    # Set up logging
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    logger.info("Setting up API server")
+    
+    # Initialize Arduino controller (if not disabled)
     arduino_controller = None
-    camera_manager = None
-    api_server = None
-
-    # 优先初始化真实 Arduino 控制器（如果未指定--no-arduino）
-    if not (args and args.no_arduino):
+    if not args.no_arduino:
         try:
-            arduino_controller = ArduinoController(
-                port=config.get('arduino', 'port'),
-                baud_rate=config.get('arduino', 'baud_rate', 9600)
-            )
-            logger.info("真实 Arduino 控制器初始化成功")
+            from modules.arduino.controller import ArduinoController
+            from utils.device_discovery import discover_arduino_device
+            
+            # Try to discover Arduino device
+            port = discover_arduino_device()
+            if port:
+                arduino_controller = ArduinoController(port=port)
+                logger.info(f"Arduino controller initialized on port {port}")
+            else:
+                logger.warning("No Arduino device found, running in camera-only mode")
         except Exception as e:
-            logger.warning(f"真实 Arduino 初始化失败: {e}，切换到模拟 Arduino")
-            # 初始化模拟 Arduino
-            arduino_controller = MockArduinoController()
-            logger.info("模拟 Arduino 控制器初始化成功")
+            logger.error(f"Error initializing Arduino controller: {e}")
     else:
-        logger.info("以仅相机模式运行，不使用Arduino控制器")
-
-    # 初始化 摄像头管理器
+        logger.info("Arduino controller disabled by command line argument")
+    
+    # Initialize camera manager
+    camera_manager = None
     try:
-        camera_manager = CameraManager(
-            resolution=config.get('camera', 'resolution', [640, 480]),
-            framerate=config.get('camera', 'framerate', 30)
-        )
-        logger.info("摄像头管理器初始化成功")
+        from modules.camera.camera_manager import CameraManager
+        camera_manager = CameraManager()
+        logger.info("Camera manager initialized")
     except Exception as e:
-        logger.warning(f"摄像头初始化失败: {e}")
-
-    # 初始化 API 服务器
-    try:
-        api_server = APIServer(
-            arduino_controller=arduino_controller,  # 可能为None或模拟控制器
-            camera_manager=camera_manager,
-            host=config.get('server', 'host', '0.0.0.0'),
-            port=config.get('server', 'port', 5000)
-        )
-        logger.info("API 服务器初始化成功")
-    except Exception as e:
-        logger.error(f"API 服务器初始化失败: {e}")
-        raise
-
-    return arduino_controller, camera_manager, api_server
+        logger.error(f"Error initializing camera manager: {e}")
+    
+    # Create API server
+    api_server = APIServer(
+        arduino_controller=arduino_controller,
+        camera_manager=camera_manager,
+        host=args.host,
+        port=args.port,
+        debug=args.debug
+    )
+    
+    # Start camera debug window if requested
+    if args.debug_camera and camera_manager:
+        api_server.start_camera_debug()
+    
+    return api_server
 
 def main():
-    """主函数"""
-    # 解析命令行参数
+    """Main entry point"""
     args = parse_args()
+    api_server = setup(args)
+    
+    # Set up signal handlers
+    def signal_handler(sig, frame):
+        logger.info("Received shutdown signal")
+        api_server.stop()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Start server
+    api_server.start()
     
     try:
-        # 如果仅测试摄像头
-        if args.only_camera:
-            try:
-                print("仅启动摄像头测试模式...")
-                camera = CameraManager(
-                    resolution=(640, 480),
-                    framerate=30
-                )
-                camera.start_debug_window("摄像头测试")
-                print("按ESC键退出")
-                while True:
-                    time.sleep(0.1)
-            except KeyboardInterrupt:
-                pass
-            except Exception as e:
-                print(f"摄像头测试失败: {e}")
-            finally:
-                if 'camera' in locals():
-                    camera.close()
-                return
-
-        # 初始化组件
-        components = setup(args)  # 传递args参数
-        arduino_controller, camera_manager, api_server = components
-        
-        # 注册信号处理
-        signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, components))
-        signal.signal(signal.SIGTERM, lambda sig, frame: signal_handler(sig, frame, components))
-        
-        # 启动API服务器
-        api_server.start()
-        
-        # 如果启用了摄像头调试，打开调试窗口
-        if args.debug_camera and camera_manager:
-            logger.info(f"启用摄像头调试窗口: {args.debug_window_name}")
-            camera_manager.start_debug_window(args.debug_window_name)
-            print(f"摄像头调试窗口已启动: {args.debug_window_name}")
-            print("按ESC键可关闭调试窗口")
-        
-        # 保持主线程运行
-        print("系统已启动" + ("（仅相机模式）" if args.no_arduino else ""))
-        print("按Ctrl+C退出")
+        # Keep main thread alive
         while True:
-            signal.pause()
-            
-    except Exception as e:
-        logger.error(f"系统启动失败: {e}")
-        if 'components' in locals():
-            cleanup(*components)
-        sys.exit(1) 
+            time.sleep(1)
+    except KeyboardInterrupt:
+        api_server.stop()
+
+if __name__ == "__main__":
+    main() 

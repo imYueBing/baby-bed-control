@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-API端点包初始化文件
-
-导出所有API端点蓝图
+API Endpoint Package Initialization File
+Exports all API endpoint blueprints
 """
 
-# 导出端点蓝图
+# Export endpoint blueprints
 from .bed import bed_api, init_bed_api
 from .heart_rate import heart_rate_api, init_heart_rate_api
 from .video import video_api, init_video_api

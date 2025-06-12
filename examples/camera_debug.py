@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-摄像头调试示例 - 在本地显示摄像头捕获的画面
+Camera Debug Example - Display camera capture locally
 """
 
 import sys
@@ -11,10 +11,10 @@ import time
 import signal
 import logging
 
-# 确保可以导入项目模块
+# Ensure project modules can be imported
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# 配置日志
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -23,38 +23,38 @@ logging.basicConfig(
 from modules.camera import CameraManager
 
 def signal_handler(sig, frame):
-    """处理 Ctrl+C 信号"""
-    print('\n正在停止...')
+    """Handle Ctrl+C signal"""
+    print('\nStopping...')
     if camera:
         camera.close()
     sys.exit(0)
 
 if __name__ == "__main__":
-    # 注册信号处理
+    # Register signal handler
     signal.signal(signal.SIGINT, signal_handler)
     
-    # 创建相机管理器实例
+    # Create camera manager instance
     camera = CameraManager(
-        resolution=(800, 600),  # 更高的分辨率以便更好地查看
+        resolution=(800, 600),  # Higher resolution for better viewing
         framerate=30,
-        use_picamera=True  # 使用树莓派相机
+        use_picamera=True  # Use Raspberry Pi camera
     )
     
-    # 启动本地调试窗口
+    # Start local debug window
     camera.start_debug_window(window_name="Raspberry Pi Camera Module 3")
     
-    print("摄像头调试窗口已启动")
-    print("按ESC键或Ctrl+C退出")
+    print("Camera debug window started")
+    print("Press ESC key or Ctrl+C to exit")
     
     try:
-        # 保持程序运行直到用户停止
+        # Keep program running until user stops it
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         pass
     finally:
-        # 确保正确关闭相机
+        # Ensure camera is properly closed
         if camera:
             camera.stop_debug_window()
             camera.close()
-            print("已关闭摄像头") 
+            print("Camera closed") 

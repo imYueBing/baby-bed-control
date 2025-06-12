@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-系统信息API端点模块 - 为前端应用提供系统信息接口
+System Information API Endpoint Module - Provides system information interfaces for frontend applications
 """
 
 import logging
@@ -10,27 +10,27 @@ import platform
 from datetime import datetime
 from flask import Blueprint, jsonify
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 
-# 创建蓝图
+# Create blueprint
 system_api = Blueprint('system_api', __name__)
 
 def init_system_api(arduino_controller, camera_manager):
     """
-    初始化系统信息API
+    Initialize system information API
     
     Args:
-        arduino_controller: Arduino控制器实例
-        camera_manager: 摄像头管理器实例
+        arduino_controller: Arduino controller instance
+        camera_manager: Camera manager instance
         
     Returns:
-        Blueprint: 初始化后的蓝图对象
+        Blueprint: Initialized blueprint object
     """
     
     @system_api.route('/api/status', methods=['GET'])
     def get_status():
-        """获取系统状态"""
+        """Get system status"""
         bed_height = arduino_controller.get_bed_height()
         heart_rate = arduino_controller.get_heart_rate()
         
@@ -45,7 +45,7 @@ def init_system_api(arduino_controller, camera_manager):
     
     @system_api.route('/api/system/info', methods=['GET'])
     def get_system_info():
-        """获取系统信息"""
+        """Get system information"""
         try:
             import psutil
             cpu_percent = psutil.cpu_percent()
@@ -58,7 +58,7 @@ def init_system_api(arduino_controller, camera_manager):
                 'disk_percent': disk.percent
             }
         except ImportError:
-            # psutil可能不可用
+            # psutil may not be available
             resource_info = {
                 'cpu_percent': 'N/A',
                 'memory_percent': 'N/A',
@@ -76,5 +76,5 @@ def init_system_api(arduino_controller, camera_manager):
             'timestamp': datetime.now().isoformat()
         })
     
-    # 返回蓝图
+    # Return blueprint
     return system_api 

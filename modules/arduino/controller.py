@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Arduino控制器模块 - 整合床体控制和心率监测功能
+Arduino Controller Module - Integrates bed control and heart rate monitoring functions
 """
 
 import logging
@@ -10,186 +10,186 @@ from .bed_controller import BedController
 from .heart_rate_controller import HeartRateController
 from utils.device_discovery import discover_arduino_device
 
-# 配置日志
+# Configure logging
 logger = logging.getLogger(__name__)
 
 class ArduinoController:
     """
-    Arduino控制器类，整合床体控制和心率监测功能
+    Arduino Controller Class, integrates bed control and heart rate monitoring functions
     
-    这个类是一个façade（外观模式），简化了与Arduino的交互，
-    内部使用专门的控制器处理不同类型的功能
+    This class is a façade (Facade pattern), simplifying interactions with Arduino,
+    using specialized controllers internally to handle different types of functionality
     """
     
     def __init__(self, port=None, baud_rate=9600, timeout=1):
         """
-        初始化Arduino控制器
+        Initialize Arduino controller
         
         Args:
-            port (str, optional): 串行端口，如果为None则自动发现
-            baud_rate (int): 波特率
-            timeout (float): 读取超时（秒）
+            port (str, optional): Serial port, if None will auto-discover
+            baud_rate (int): Baud rate
+            timeout (float): Read timeout (seconds)
         """
-        # 如果没有指定端口，尝试自动发现
+        # If no port specified, try auto-discovery
         if port is None:
             port = discover_arduino_device(baud_rate)
             if port:
-                logger.info(f"自动发现Arduino设备: {port}")
+                logger.info(f"Auto-discovered Arduino device: {port}")
             else:
-                logger.warning("未找到Arduino设备，将使用模拟设备")
-                port = "/dev/ttyNONEXISTENT"  # 使用不存在的端口，控制器将进入离线模式
+                logger.warning("No Arduino device found, will use simulated device")
+                port = "/dev/ttyNONEXISTENT"  # Use non-existent port, controller will enter offline mode
         
-        # 创建专门的控制器
+        # Create specialized controllers
         self.bed_controller = BedController(port, baud_rate, timeout)
         self.heart_rate_controller = HeartRateController(port, baud_rate, timeout)
         
-        # 控制器连接状态
+        # Controller connection status
         self.is_connected = (self.bed_controller.is_connected and 
                             self.heart_rate_controller.is_connected)
     
-    # --------- 床体控制相关方法 ---------
+    # --------- Bed Control Related Methods ---------
     
     def bed_up(self):
         """
-        整体升高床
+        Raise the entire bed
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.bed_up()
     
     def bed_down(self):
         """
-        整体降低床
+        Lower the entire bed
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.bed_down()
     
     def bed_stop(self):
         """
-        整体停止床体移动
+        Stop all bed movement
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.bed_stop()
     
     def left_up(self):
         """
-        左侧升高床
+        Raise the left side of the bed
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.left_up()
     
     def left_down(self):
         """
-        左侧降低床
+        Lower the left side of the bed
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.left_down()
     
     def left_stop(self):
         """
-        左侧停止床体移动
+        Stop left side bed movement
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.left_stop()
     
     def right_up(self):
         """
-        右侧升高床
+        Raise the right side of the bed
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.right_up()
     
     def right_down(self):
         """
-        右侧降低床
+        Lower the right side of the bed
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.right_down()
     
     def right_stop(self):
         """
-        右侧停止床体移动
+        Stop right side bed movement
         
         Returns:
-            bool: 命令是否已发送
+            bool: Whether the command was sent
         """
         return self.bed_controller.right_stop()
     
     def get_bed_status(self):
         """
-        获取床体当前状态
+        Get current bed status
         
         Returns:
-            dict: 床体状态信息
+            dict: Bed status information
         """
         return self.bed_controller.get_bed_status()
     
     def get_bed_height(self):
         """
-        获取床体当前高度 (为兼容旧API保留)
+        Get current bed height (kept for compatibility with old API)
         
         Returns:
-            dict: 床体状态信息
+            dict: Bed status information
         """
         return self.get_bed_status()
     
-    # --------- 心率监测相关方法 ---------
+    # --------- Heart Rate Monitoring Related Methods ---------
     
     def get_heart_rate(self):
         """
-        获取当前心率
+        Get current heart rate
         
         Returns:
-            int or None: 当前心率，如果未知则为None
+            int or None: Current heart rate, or None if unknown
         """
         return self.heart_rate_controller.get_heart_rate()
     
     def subscribe_heart_rate(self, callback):
         """
-        订阅心率数据
+        Subscribe to heart rate data
         
         Args:
-            callback (callable): 当收到新心率数据时调用的回调函数，参数为心率值
+            callback (callable): Callback function to call when new heart rate data is received, with heart rate as parameter
         """
         self.heart_rate_controller.subscribe_heart_rate(callback)
     
     def unsubscribe_heart_rate(self, callback):
         """
-        取消订阅心率数据
+        Unsubscribe from heart rate data
         
         Args:
-            callback (callable): 先前注册的回调函数
+            callback (callable): Previously registered callback function
         """
         self.heart_rate_controller.unsubscribe_heart_rate(callback)
     
-    # --------- 通用方法 ---------
+    # --------- General Methods ---------
     
     def close(self):
-        """关闭所有控制器连接"""
+        """Close all controller connections"""
         self.bed_controller.close()
         self.heart_rate_controller.close()
     
     def get_system_status(self):
         """
-        获取系统状态
+        Get system status
         
         Returns:
-            dict: 系统状态信息
+            dict: System status information
         """
         return {
             'bed_height': self.get_bed_height(),
